@@ -584,3 +584,124 @@ function Info({ label, value }: { label: string; value?: string | null }) {
     </div>
   );
 }
+
+// =============================
+// Excel風セル表示に寄せた差し替えポイント
+// 下のコンポーネントを WeeklyScheduleBoard.tsx に追加し、
+// 既存のカード表示部分を ScheduleCellItem に置き換えてください。
+// =============================
+
+export function ScheduleCellItem({
+  block,
+  onClick,
+}: {
+  block: ScheduleBlockRow;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="block w-full rounded-none border border-slate-300 bg-white text-left text-[11px] leading-tight hover:bg-slate-50"
+    >
+      <div className="grid grid-cols-[1fr_auto] border-b border-slate-300">
+        <div className="truncate px-1 py-0.5 font-semibold">{block.part_name}</div>
+        <div className="border-l border-slate-300 px-1 py-0.5 text-right">
+          {block.unit_name}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[58px_1fr] border-b border-slate-200">
+        <div className="border-r border-slate-200 px-1 py-0.5 text-slate-500">受注</div>
+        <div className="truncate px-1 py-0.5">{block.order_number ?? "-"}</div>
+      </div>
+
+      <div className="grid grid-cols-[58px_1fr] border-b border-slate-200">
+        <div className="border-r border-slate-200 px-1 py-0.5 text-slate-500">品名</div>
+        <div className="truncate px-1 py-0.5" title={block.product_name ?? ""}>
+          {block.product_name ?? "-"}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-[58px_1fr] border-b border-slate-200">
+        <div className="border-r border-slate-200 px-1 py-0.5 text-slate-500">版型</div>
+        <div className="px-1 py-0.5">{block.plate_size ?? "-"}</div>
+      </div>
+
+      <div className="grid grid-cols-[58px_1fr] border-b border-slate-200">
+        <div className="border-r border-slate-200 px-1 py-0.5 text-slate-500">色/通紙</div>
+        <div className="px-1 py-0.5">
+          {block.color_front ?? "-"}/{block.color_back ?? "-"}・{compactNumber(block.print_count)}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-5 border-b border-slate-200 text-center text-[10px]">
+        <CheckMini label="DTP" checked={!!block.dtp_completed} />
+        <CheckMini label="紙" checked={!!block.paper_stacked} />
+        <CheckMini label="下版" checked={!!block.plate_completed} />
+        <CheckMini label="PP" checked={!!block.pp_processed} />
+        <CheckMini label="刷了" checked={!!block.printing_completed} />
+      </div>
+
+      <div className="grid grid-cols-[1fr_auto] items-center">
+        <div className="px-1 py-0.5 text-[10px] text-slate-500">
+          {getStatusLabel(block.block_status)}
+        </div>
+        <div className="border-l border-slate-200 px-1 py-0.5 text-right font-medium">
+          {block.sequence_no ?? "-"}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function CheckMini({
+  label,
+  checked,
+}: {
+  label: string;
+  checked: boolean;
+}) {
+  return (
+    <div className="border-r border-slate-200 last:border-r-0 px-0.5 py-0.5">
+      <div className="text-[9px] text-slate-500">{label}</div>
+      <div className="mt-0.5 flex items-center justify-center">
+        <span
+          className={`inline-flex h-3 w-3 items-center justify-center border text-[9px] ${checked ? "border-slate-700 bg-slate-700 text-white" : "border-slate-400 bg-white"
+            }`}
+        >
+          {checked ? "✓" : ""}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// =============================
+// 既存のセル描画部分の差し替え例
+// WeeklyScheduleBoard.tsx 内の cell.blocks.map(...) を下記に置換
+// =============================
+
+// {cell?.blocks.length ? (
+//   cell.blocks.map((block) => (
+//     <ScheduleCellItem
+//       key={block.block_id}
+//       block={block}
+//       onClick={() => setSelectedBlock(block)}
+//     />
+//   ))
+// ) : (
+//   <div className="pt-6 text-center text-xs text-muted-foreground">-</div>
+// )}
+
+// =============================
+// テーブル全体の見本寄せ推奨スタイル
+// 下記の className に近づけるとスプレッドシート感が増します
+// =============================
+
+// table: "min-w-[1800px] border-collapse text-[11px]"
+// thead th: "border border-slate-300 bg-[#f7f7f7] px-1 py-1 font-bold"
+// tbody td: "border border-slate-300 align-top p-0"
+// row header td: "sticky left-0 z-10 border border-slate-300 bg-white px-1 py-1 font-bold whitespace-nowrap"
+// cell wrapper: "min-h-[92px] space-y-[1px] bg-white"
+
