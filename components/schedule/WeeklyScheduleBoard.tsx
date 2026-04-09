@@ -541,7 +541,7 @@ export function ScheduleCellItem({
     <button
       type="button"
       onClick={onClick}
-      className="block w-full rounded-none border border-slate-300 bg-white text-left text-[11px] leading-tight hover:bg-slate-50"
+      className="block w-full rounded-none border-2 border-red-500 bg-yellow-50 text-left text-[11px] leading-tight hover:bg-slate-50"
     >
       <div className="grid grid-cols-[1fr_auto] border-b border-slate-300">
         <div className="truncate px-1 py-0.5 font-semibold">{block.part_name}</div>
