@@ -1,10 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -166,19 +164,9 @@ function makeCellKey(machineId: string, shiftCategory: string, date: string) {
   return `${machineId}__${shiftCategory}__${date}`;
 }
 
-function getStatusVariant(status: ScheduleBlockRow["block_status"]) {
-  switch (status) {
-    case "confirmed":
-      return "default" as const;
-    case "completed":
-      return "secondary" as const;
-    case "tentative":
-      return "outline" as const;
-    case "assigned":
-      return "secondary" as const;
-    default:
-      return "outline" as const;
-  }
+function compactNumber(value: number | null) {
+  if (value == null) return "-";
+  return value.toLocaleString("ja-JP");
 }
 
 function getStatusLabel(status: ScheduleBlockRow["block_status"]) {
@@ -194,11 +182,6 @@ function getStatusLabel(status: ScheduleBlockRow["block_status"]) {
     case "completed":
       return "完了";
   }
-}
-
-function compactNumber(value: number | null) {
-  if (value == null) return "-";
-  return value.toLocaleString("ja-JP");
 }
 
 function buildEmptyData(baseDate?: string): WeeklyCalendarData {
@@ -323,9 +306,10 @@ export default function WeeklyScheduleBoard({
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
-      return !q || haystack.includes(q);
+      if (!showUnassignedOnly) return !q || haystack.includes(q);
+      return (!item.machine_id || !item.scheduled_date) && (!q || haystack.includes(q));
     });
-  }, [data.unassignedBlocks, query]);
+  }, [data.unassignedBlocks, query, showUnassignedOnly]);
 
   const machineRows = React.useMemo(() => {
     return data.machineRows.filter((row) => {
@@ -351,7 +335,7 @@ export default function WeeklyScheduleBoard({
   };
 
   return (
-    <div className="grid h-full min-h-[760px] grid-cols-[360px_1fr] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
+    <div className="grid h-full min-h-[760px] grid-cols-[420px_1fr] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
       <aside className="flex h-full flex-col border-r bg-white">
         <div className="border-b p-4">
           <h2 className="text-lg font-bold tracking-tight">未割当案件</h2>
@@ -384,42 +368,36 @@ export default function WeeklyScheduleBoard({
               {filteredUnassigned.map((item) => (
                 <button
                   key={item.block_id}
-                  className="w-full p-4 text-left transition-colors hover:bg-slate-50"
+                  className="w-full p-0 text-left transition-colors hover:bg-slate-50"
                   onClick={() => setSelectedBlock(item)}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-base font-bold leading-none">{item.unit_name}</div>
-                      <div className="mt-1 text-sm text-slate-700">{item.part_name}</div>
+                  <div className="border-b border-slate-300 bg-white p-0">
+                    <div className="grid grid-cols-[1fr_auto] border-b border-slate-300">
+                      <div className="truncate px-2 py-1 font-semibold">{item.unit_name}</div>
+                      <div className="border-l border-slate-300 px-2 py-1 font-medium">詳細</div>
                     </div>
-                    <span className="text-sm font-semibold text-slate-900">詳細</span>
-                  </div>
+                    <div className="grid grid-cols-[70px_1fr_70px_1fr] text-[11px]">
+                      <div className="border-r border-b border-slate-200 px-2 py-1 text-slate-500">部品</div>
+                      <div className="border-r border-b border-slate-200 px-2 py-1">{item.part_name}</div>
+                      <div className="border-r border-b border-slate-200 px-2 py-1 text-slate-500">版型</div>
+                      <div className="border-b border-slate-200 px-2 py-1">{item.plate_size ?? "-"}</div>
 
-                  <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">受注: </span>
-                      <span>{item.order_number ?? "-"}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">品名: </span>
-                      <span title={item.product_name ?? ""} className="line-clamp-1">
-                        {item.product_name ?? "-"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">得意先: </span>
-                      <span title={item.customer_name ?? ""} className="line-clamp-1">
+                      <div className="border-r border-b border-slate-200 px-2 py-1 text-slate-500">受注</div>
+                      <div className="border-r border-b border-slate-200 px-2 py-1">{item.order_number ?? "-"}</div>
+                      <div className="border-r border-b border-slate-200 px-2 py-1 text-slate-500">色/通紙</div>
+                      <div className="border-b border-slate-200 px-2 py-1">
+                        {item.color_front ?? "-"}/{item.color_back ?? "-"}・{compactNumber(item.print_count)}
+                      </div>
+
+                      <div className="border-r border-slate-200 px-2 py-1 text-slate-500">得意先</div>
+                      <div className="border-r border-slate-200 px-2 py-1 truncate" title={item.customer_name ?? ""}>
                         {item.customer_name ?? "-"}
-                      </span>
+                      </div>
+                      <div className="border-r border-slate-200 px-2 py-1 text-slate-500">品名</div>
+                      <div className="px-2 py-1 truncate" title={item.product_name ?? ""}>
+                        {item.product_name ?? "-"}
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">版型: </span>
-                      <span>{item.plate_size ?? "-"}</span>
-                    </div>
-                  </div>
-
-                  <div className="mt-2 text-sm text-slate-700">
-                    {item.color_front ?? "-"}/{item.color_back ?? "-"}色 {compactNumber(item.print_count)}通紙
                   </div>
                 </button>
               ))}
@@ -461,21 +439,19 @@ export default function WeeklyScheduleBoard({
           </div>
         </div>
 
-        {error ? (
-          <div className="p-4 text-sm text-red-600">{error}</div>
-        ) : null}
+        {error ? <div className="p-4 text-sm text-red-600">{error}</div> : null}
 
         <div className="flex-1 overflow-auto">
-          <table className="min-w-[1400px] border-collapse text-sm">
+          <table className="min-w-[1800px] border-collapse text-[11px]">
             <thead className="sticky top-0 z-20 bg-white">
               <tr>
-                <th className="sticky left-0 z-30 border-b border-r bg-white px-3 py-2 text-left font-bold whitespace-nowrap">
+                <th className="sticky left-0 z-30 border border-slate-300 bg-[#f7f7f7] px-1 py-1 text-left font-bold whitespace-nowrap">
                   印刷機
                 </th>
                 {data.weekDays.map((day) => (
                   <th
                     key={day.date}
-                    className={`border-b border-r px-3 py-2 text-center font-bold min-w-[180px] ${day.date === today ? "bg-sky-50" : "bg-white"}`}
+                    className={`border border-slate-300 px-1 py-1 text-center font-bold min-w-[220px] ${day.date === today ? "bg-sky-50" : "bg-[#f7f7f7]"}`}
                   >
                     <div>{day.label}({day.weekday})</div>
                   </th>
@@ -485,9 +461,9 @@ export default function WeeklyScheduleBoard({
             <tbody>
               {machineRows.map((row) => (
                 <tr key={`${row.machine_id}-${row.shift_category}`}>
-                  <td className="sticky left-0 z-10 border-b border-r bg-white px-3 py-3 align-top font-bold whitespace-nowrap">
+                  <td className="sticky left-0 z-10 border border-slate-300 bg-white px-1 py-1 align-top font-bold whitespace-nowrap">
                     <div>{row.machine_name}</div>
-                    <div className="text-xs text-muted-foreground">{row.shift_label}</div>
+                    <div className="text-[10px] text-muted-foreground">{row.shift_label}</div>
                   </td>
 
                   {data.weekDays.map((day) => {
@@ -496,40 +472,18 @@ export default function WeeklyScheduleBoard({
                     return (
                       <td
                         key={key}
-                        className={`border-b border-r align-top ${day.date === today ? "bg-sky-50/40" : "bg-white"}`}
+                        className={`border border-slate-300 align-top p-0 ${day.date === today ? "bg-sky-50/40" : "bg-white"}`}
                       >
-                        <div className="min-h-[120px] space-y-2 p-2">
+                        <div className="min-h-[92px] space-y-[1px] bg-white">
                           {loading ? (
                             <div className="pt-6 text-center text-xs text-muted-foreground">読み込み中…</div>
                           ) : cell?.blocks.length ? (
                             cell.blocks.map((block) => (
-                              <Card
+                              <ScheduleCellItem
                                 key={block.block_id}
-                                className="cursor-pointer rounded-md border shadow-none transition-shadow hover:shadow-sm"
+                                block={block}
                                 onClick={() => setSelectedBlock(block)}
-                              >
-                                <CardContent className="p-2">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="min-w-0">
-                                      <div className="truncate font-bold">{block.unit_name}</div>
-                                      <div className="text-xs text-slate-700">{block.part_name}</div>
-                                    </div>
-                                    <Badge variant={getStatusVariant(block.block_status)}>
-                                      {getStatusLabel(block.block_status)}
-                                    </Badge>
-                                  </div>
-
-                                  <div className="mt-2 space-y-1 text-xs text-slate-700">
-                                    <div>{block.order_number}</div>
-                                    <div title={block.product_name ?? ""} className="truncate">
-                                      {block.product_name ?? "-"}
-                                    </div>
-                                    <div>
-                                      {block.color_front ?? "-"}/{block.color_back ?? "-"} ・ {compactNumber(block.print_count)}通紙
-                                    </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
+                              />
                             ))
                           ) : (
                             <div className="pt-6 text-center text-xs text-muted-foreground">-</div>
@@ -575,21 +529,6 @@ export default function WeeklyScheduleBoard({
     </div>
   );
 }
-
-function Info({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <div className="rounded-lg border p-3">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 text-sm font-medium break-words">{value || "-"}</div>
-    </div>
-  );
-}
-
-// =============================
-// Excel風セル表示に寄せた差し替えポイント
-// 下のコンポーネントを WeeklyScheduleBoard.tsx に追加し、
-// 既存のカード表示部分を ScheduleCellItem に置き換えてください。
-// =============================
 
 export function ScheduleCellItem({
   block,
@@ -677,31 +616,11 @@ function CheckMini({
   );
 }
 
-// =============================
-// 既存のセル描画部分の差し替え例
-// WeeklyScheduleBoard.tsx 内の cell.blocks.map(...) を下記に置換
-// =============================
-
-// {cell?.blocks.length ? (
-//   cell.blocks.map((block) => (
-//     <ScheduleCellItem
-//       key={block.block_id}
-//       block={block}
-//       onClick={() => setSelectedBlock(block)}
-//     />
-//   ))
-// ) : (
-//   <div className="pt-6 text-center text-xs text-muted-foreground">-</div>
-// )}
-
-// =============================
-// テーブル全体の見本寄せ推奨スタイル
-// 下記の className に近づけるとスプレッドシート感が増します
-// =============================
-
-// table: "min-w-[1800px] border-collapse text-[11px]"
-// thead th: "border border-slate-300 bg-[#f7f7f7] px-1 py-1 font-bold"
-// tbody td: "border border-slate-300 align-top p-0"
-// row header td: "sticky left-0 z-10 border border-slate-300 bg-white px-1 py-1 font-bold whitespace-nowrap"
-// cell wrapper: "min-h-[92px] space-y-[1px] bg-white"
-
+function Info({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="rounded-lg border p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 text-sm font-medium break-words">{value || "-"}</div>
+    </div>
+  );
+}
