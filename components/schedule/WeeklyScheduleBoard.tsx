@@ -1,0 +1,586 @@
+"use client";
+
+import * as React from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Search, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
+
+export type ShiftCategory = "day" | "night" | null;
+
+export type ScheduleBlockRow = {
+  block_id: string;
+  print_unit_id: string;
+  block_no: number;
+  scheduled_date: string | null;
+  machine_id: string | null;
+  shift_category: ShiftCategory;
+  shift_label: string;
+  shift_sort_order: number;
+  sequence_no: number | null;
+  planned_print_count: number | null;
+  block_note: string | null;
+  block_status:
+  | "unassigned"
+  | "tentative"
+  | "assigned"
+  | "confirmed"
+  | "completed";
+  machine_name: string | null;
+  manufacturer: string | null;
+  machine_type: string | null;
+  sheet_group: string | null;
+  perfecting_type: string | null;
+  display_order: number | null;
+  machine_is_active: boolean | null;
+  machine_shift_name: string;
+  print_unit_id_ref: string;
+  print_item_id: string;
+  unit_no: number;
+  unit_name: string;
+  assigned_machine_id: string | null;
+  unit_status: "unassigned" | "assigned" | "confirmed" | "completed";
+  print_item_id_ref: string;
+  order_entry_id: string;
+  source_file_id: string | null;
+  part_name: string;
+  default_machine_id: string | null;
+  plate_size: string | null;
+  color_front: number | null;
+  color_back: number | null;
+  color_note: string | null;
+  print_count: number | null;
+  press_count: number;
+  imposition: string | null;
+  page_count: number | null;
+  fold_count: number | null;
+  print_item_note: string | null;
+  dtp_completed: boolean | null;
+  paper_stacked: boolean | null;
+  plate_completed: boolean | null;
+  pp_processed: boolean | null;
+  printing_completed: boolean | null;
+  order_number: string | null;
+  customer_code: string | null;
+  customer_name: string | null;
+  product_name: string | null;
+  sales_user_code: string | null;
+  order_date: string | null;
+  source_file_name: string | null;
+  source_file_url: string | null;
+  source_file_type: string | null;
+  source_file_is_instruction: boolean | null;
+  source_file_parsed_status: string | null;
+  source_file_version_no: number | null;
+  source_file_is_latest: boolean | null;
+};
+
+export type MachineRow = {
+  machine_id: string;
+  machine_name: string;
+  display_order: number;
+  shift_category: "day" | "night";
+  shift_label: "日勤" | "夜勤";
+  machine_shift_name: string;
+};
+
+export type WeekDay = {
+  date: string;
+  label: string;
+  weekday: string;
+};
+
+export type WeeklyCalendarCell = {
+  machine_id: string;
+  shift_category: "day" | "night";
+  date: string;
+  blocks: ScheduleBlockRow[];
+};
+
+export type WeeklyCalendarData = {
+  weekDays: WeekDay[];
+  machineRows: MachineRow[];
+  cells: Record<string, WeeklyCalendarCell>;
+  unassignedBlocks: ScheduleBlockRow[];
+};
+
+type WeeklyScheduleBoardProps = {
+  initialData?: WeeklyCalendarData;
+  initialBaseDate?: string;
+};
+
+function formatDateJP(dateStr: string) {
+  const d = new Date(dateStr);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+function getWeekdayJP(dateStr: string) {
+  const weekdays = ["日", "月", "火", "水", "木", "金", "土"];
+  return weekdays[new Date(dateStr).getDay()];
+}
+
+function startOfWeek(date: Date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - d.getDay());
+  return d;
+}
+
+function formatYmd(date: Date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function buildWeekDaysFromBase(baseDate?: string): WeekDay[] {
+  const base = baseDate ? new Date(baseDate) : new Date();
+  const start = startOfWeek(base);
+  return Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const date = formatYmd(d);
+    return {
+      date,
+      label: formatDateJP(date),
+      weekday: getWeekdayJP(date),
+    };
+  });
+}
+
+function makeCellKey(machineId: string, shiftCategory: string, date: string) {
+  return `${machineId}__${shiftCategory}__${date}`;
+}
+
+function getStatusVariant(status: ScheduleBlockRow["block_status"]) {
+  switch (status) {
+    case "confirmed":
+      return "default" as const;
+    case "completed":
+      return "secondary" as const;
+    case "tentative":
+      return "outline" as const;
+    case "assigned":
+      return "secondary" as const;
+    default:
+      return "outline" as const;
+  }
+}
+
+function getStatusLabel(status: ScheduleBlockRow["block_status"]) {
+  switch (status) {
+    case "unassigned":
+      return "未割当";
+    case "tentative":
+      return "仮";
+    case "assigned":
+      return "割当済";
+    case "confirmed":
+      return "確定";
+    case "completed":
+      return "完了";
+  }
+}
+
+function compactNumber(value: number | null) {
+  if (value == null) return "-";
+  return value.toLocaleString("ja-JP");
+}
+
+function buildEmptyData(baseDate?: string): WeeklyCalendarData {
+  const weekDays = buildWeekDaysFromBase(baseDate);
+  const machines = [
+    { machine_id: "7", machine_name: "7号機", display_order: 1 },
+    { machine_id: "8", machine_name: "8号機", display_order: 2 },
+    { machine_id: "10", machine_name: "10号機", display_order: 3 },
+    { machine_id: "jp", machine_name: "JP", display_order: 4 },
+    { machine_id: "outside", machine_name: "外注", display_order: 5 },
+  ];
+
+  const machineRows: MachineRow[] = machines.flatMap((m) => [
+    {
+      machine_id: m.machine_id,
+      machine_name: m.machine_name,
+      display_order: m.display_order,
+      shift_category: "day",
+      shift_label: "日勤",
+      machine_shift_name: `${m.machine_name} 日勤`,
+    },
+    {
+      machine_id: m.machine_id,
+      machine_name: m.machine_name,
+      display_order: m.display_order,
+      shift_category: "night",
+      shift_label: "夜勤",
+      machine_shift_name: `${m.machine_name} 夜勤`,
+    },
+  ]);
+
+  const cells: Record<string, WeeklyCalendarCell> = {};
+  machineRows.forEach((row) => {
+    weekDays.forEach((day) => {
+      const key = makeCellKey(row.machine_id, row.shift_category, day.date);
+      cells[key] = {
+        machine_id: row.machine_id,
+        shift_category: row.shift_category,
+        date: day.date,
+        blocks: [],
+      };
+    });
+  });
+
+  return {
+    weekDays,
+    machineRows,
+    cells,
+    unassignedBlocks: [],
+  };
+}
+
+async function fetchWeeklyCalendarData(baseDate?: string): Promise<WeeklyCalendarData> {
+  const qs = new URLSearchParams();
+  if (baseDate) qs.set("date", baseDate);
+  const res = await fetch(`/api/schedule/weekly?${qs.toString()}`, {
+    method: "GET",
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? "週間予定データの取得に失敗しました");
+  }
+
+  return res.json();
+}
+
+export default function WeeklyScheduleBoard({
+  initialData,
+  initialBaseDate,
+}: WeeklyScheduleBoardProps) {
+  const [baseDate, setBaseDate] = React.useState<string>(
+    initialBaseDate ?? formatYmd(new Date()),
+  );
+  const [data, setData] = React.useState<WeeklyCalendarData>(
+    initialData ?? buildEmptyData(initialBaseDate),
+  );
+  const [loading, setLoading] = React.useState(!initialData);
+  const [error, setError] = React.useState<string | null>(null);
+  const [query, setQuery] = React.useState("");
+  const [showUnassignedOnly, setShowUnassignedOnly] = React.useState(true);
+  const [machineFilter, setMachineFilter] = React.useState<string>("all");
+  const [selectedBlock, setSelectedBlock] = React.useState<ScheduleBlockRow | null>(null);
+
+  const loadData = React.useCallback(async (date?: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const next = await fetchWeeklyCalendarData(date ?? baseDate);
+      setData(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "読み込みに失敗しました");
+    } finally {
+      setLoading(false);
+    }
+  }, [baseDate]);
+
+  React.useEffect(() => {
+    if (!initialData) {
+      void loadData(baseDate);
+    }
+  }, [initialData, baseDate, loadData]);
+
+  const weekRangeLabel = React.useMemo(() => {
+    const days = data.weekDays;
+    if (!days.length) return "";
+    return `${days[0].label} ～ ${days[days.length - 1].label}`;
+  }, [data.weekDays]);
+
+  const filteredUnassigned = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return data.unassignedBlocks.filter((item) => {
+      const haystack = [
+        item.unit_name,
+        item.part_name,
+        item.order_number,
+        item.product_name,
+        item.customer_name,
+        item.plate_size,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return !q || haystack.includes(q);
+    });
+  }, [data.unassignedBlocks, query]);
+
+  const machineRows = React.useMemo(() => {
+    return data.machineRows.filter((row) => {
+      if (machineFilter === "all") return true;
+      return row.machine_id === machineFilter;
+    });
+  }, [data.machineRows, machineFilter]);
+
+  const today = formatYmd(new Date());
+
+  const goWeek = (direction: -1 | 1) => {
+    const base = new Date(baseDate);
+    base.setDate(base.getDate() + direction * 7);
+    const next = formatYmd(base);
+    setBaseDate(next);
+    void loadData(next);
+  };
+
+  const goCurrentWeek = () => {
+    const next = formatYmd(new Date());
+    setBaseDate(next);
+    void loadData(next);
+  };
+
+  return (
+    <div className="grid h-full min-h-[760px] grid-cols-[360px_1fr] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
+      <aside className="flex h-full flex-col border-r bg-white">
+        <div className="border-b p-4">
+          <h2 className="text-lg font-bold tracking-tight">未割当案件</h2>
+          <div className="relative mt-3">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="検索…"
+              className="pl-9"
+            />
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+            <span className="text-muted-foreground">フィルタ:</span>
+            <Button
+              variant={showUnassignedOnly ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setShowUnassignedOnly((v) => !v)}
+            >
+              未割当のみ
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {filteredUnassigned.length === 0 ? (
+            <div className="p-6 text-sm text-muted-foreground">未割当案件はありません。</div>
+          ) : (
+            <div className="divide-y">
+              {filteredUnassigned.map((item) => (
+                <button
+                  key={item.block_id}
+                  className="w-full p-4 text-left transition-colors hover:bg-slate-50"
+                  onClick={() => setSelectedBlock(item)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-base font-bold leading-none">{item.unit_name}</div>
+                      <div className="mt-1 text-sm text-slate-700">{item.part_name}</div>
+                    </div>
+                    <span className="text-sm font-semibold text-slate-900">詳細</span>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">受注: </span>
+                      <span>{item.order_number ?? "-"}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">品名: </span>
+                      <span title={item.product_name ?? ""} className="line-clamp-1">
+                        {item.product_name ?? "-"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">得意先: </span>
+                      <span title={item.customer_name ?? ""} className="line-clamp-1">
+                        {item.customer_name ?? "-"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">版型: </span>
+                      <span>{item.plate_size ?? "-"}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 text-sm text-slate-700">
+                    {item.color_front ?? "-"}/{item.color_back ?? "-"}色 {compactNumber(item.print_count)}通紙
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </aside>
+
+      <section className="flex min-w-0 flex-col overflow-hidden">
+        <div className="flex items-center justify-between gap-3 border-b p-3">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={() => goWeek(-1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="min-w-[140px] text-center text-xl font-bold">{weekRangeLabel}</div>
+            <Button variant="secondary" onClick={goCurrentWeek}>今週</Button>
+            <Button variant="outline" size="icon" onClick={() => goWeek(1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Select value={machineFilter} onValueChange={setMachineFilter}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="全印刷機" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全印刷機</SelectItem>
+                {Array.from(new Map(data.machineRows.map((m) => [m.machine_id, m])).values()).map((m) => (
+                  <SelectItem key={m.machine_id} value={m.machine_id}>
+                    {m.machine_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={() => void loadData(baseDate)}>
+              <RefreshCw className="mr-2 h-4 w-4" />更新
+            </Button>
+          </div>
+        </div>
+
+        {error ? (
+          <div className="p-4 text-sm text-red-600">{error}</div>
+        ) : null}
+
+        <div className="flex-1 overflow-auto">
+          <table className="min-w-[1400px] border-collapse text-sm">
+            <thead className="sticky top-0 z-20 bg-white">
+              <tr>
+                <th className="sticky left-0 z-30 border-b border-r bg-white px-3 py-2 text-left font-bold whitespace-nowrap">
+                  印刷機
+                </th>
+                {data.weekDays.map((day) => (
+                  <th
+                    key={day.date}
+                    className={`border-b border-r px-3 py-2 text-center font-bold min-w-[180px] ${day.date === today ? "bg-sky-50" : "bg-white"}`}
+                  >
+                    <div>{day.label}({day.weekday})</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {machineRows.map((row) => (
+                <tr key={`${row.machine_id}-${row.shift_category}`}>
+                  <td className="sticky left-0 z-10 border-b border-r bg-white px-3 py-3 align-top font-bold whitespace-nowrap">
+                    <div>{row.machine_name}</div>
+                    <div className="text-xs text-muted-foreground">{row.shift_label}</div>
+                  </td>
+
+                  {data.weekDays.map((day) => {
+                    const key = makeCellKey(row.machine_id, row.shift_category, day.date);
+                    const cell = data.cells[key];
+                    return (
+                      <td
+                        key={key}
+                        className={`border-b border-r align-top ${day.date === today ? "bg-sky-50/40" : "bg-white"}`}
+                      >
+                        <div className="min-h-[120px] space-y-2 p-2">
+                          {loading ? (
+                            <div className="pt-6 text-center text-xs text-muted-foreground">読み込み中…</div>
+                          ) : cell?.blocks.length ? (
+                            cell.blocks.map((block) => (
+                              <Card
+                                key={block.block_id}
+                                className="cursor-pointer rounded-md border shadow-none transition-shadow hover:shadow-sm"
+                                onClick={() => setSelectedBlock(block)}
+                              >
+                                <CardContent className="p-2">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <div className="truncate font-bold">{block.unit_name}</div>
+                                      <div className="text-xs text-slate-700">{block.part_name}</div>
+                                    </div>
+                                    <Badge variant={getStatusVariant(block.block_status)}>
+                                      {getStatusLabel(block.block_status)}
+                                    </Badge>
+                                  </div>
+
+                                  <div className="mt-2 space-y-1 text-xs text-slate-700">
+                                    <div>{block.order_number}</div>
+                                    <div title={block.product_name ?? ""} className="truncate">
+                                      {block.product_name ?? "-"}
+                                    </div>
+                                    <div>
+                                      {block.color_front ?? "-"}/{block.color_back ?? "-"} ・ {compactNumber(block.print_count)}通紙
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            ))
+                          ) : (
+                            <div className="pt-6 text-center text-xs text-muted-foreground">-</div>
+                          )}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <Dialog open={!!selectedBlock} onOpenChange={(open) => !open && setSelectedBlock(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>案件詳細</DialogTitle>
+          </DialogHeader>
+
+          {selectedBlock ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              <Info label="受注番号" value={selectedBlock.order_number} />
+              <Info label="品名" value={selectedBlock.product_name} />
+              <Info label="得意先" value={selectedBlock.customer_name} />
+              <Info label="部品" value={selectedBlock.part_name} />
+              <Info label="ユニット" value={selectedBlock.unit_name} />
+              <Info label="版型" value={selectedBlock.plate_size} />
+              <Info label="色数" value={`${selectedBlock.color_front ?? "-"}/${selectedBlock.color_back ?? "-"}`} />
+              <Info label="色指定・備考" value={selectedBlock.color_note} />
+              <Info label="通紙" value={selectedBlock.print_count?.toLocaleString("ja-JP")} />
+              <Info label="台数" value={String(selectedBlock.press_count)} />
+              <Info label="印刷機" value={selectedBlock.machine_name} />
+              <Info label="日付" value={selectedBlock.scheduled_date} />
+              <Info label="順番" value={selectedBlock.sequence_no ? String(selectedBlock.sequence_no) : null} />
+              <Info label="状態" value={getStatusLabel(selectedBlock.block_status)} />
+              <Info label="元ファイル" value={selectedBlock.source_file_name} />
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function Info({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="rounded-lg border p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 text-sm font-medium break-words">{value || "-"}</div>
+    </div>
+  );
+}
