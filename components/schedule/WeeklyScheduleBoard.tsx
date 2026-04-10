@@ -592,57 +592,31 @@ export function ScheduleCellItem({
     <button
       type="button"
       onClick={onClick}
-      className="block w-full rounded-none border-2 border-red-500 bg-yellow-50 text-left text-[11px] leading-tight hover:bg-slate-50"
+      className="block w-full border-b border-slate-300 bg-white text-left text-[11px] hover:bg-slate-50"
     >
-      <div className="grid grid-cols-[1fr_auto] border-b border-slate-300">
-        <div className="truncate px-1 py-0.5 font-semibold">{block.part_name}</div>
-        <div className="border-l border-slate-300 px-1 py-0.5 text-right">
-          {block.unit_name}
-        </div>
-      </div>
+      <div className="grid min-h-[28px] grid-cols-[72px_1fr_34px_34px_34px_34px_34px_90px_58px_52px_70px] items-stretch">
+        <Cell className="font-medium">{block.order_number ?? "-"}</Cell>
 
-      <div className="grid grid-cols-[58px_1fr] border-b border-slate-200">
-        <div className="border-r border-slate-200 px-1 py-0.5 text-slate-500">受注</div>
-        <div className="truncate px-1 py-0.5">{block.order_number ?? "-"}</div>
-      </div>
-
-      <div className="grid grid-cols-[58px_1fr] border-b border-slate-200">
-        <div className="border-r border-slate-200 px-1 py-0.5 text-slate-500">品名</div>
-        <div className="truncate px-1 py-0.5" title={block.product_name ?? ""}>
+        <Cell title={block.product_name ?? ""} className="truncate">
           {block.product_name ?? "-"}
-        </div>
-      </div>
+        </Cell>
 
-      <div className="grid grid-cols-[58px_1fr] border-b border-slate-200">
-        <div className="border-r border-slate-200 px-1 py-0.5 text-slate-500">版型</div>
-        <div className="px-1 py-0.5">{block.plate_size ?? "-"}</div>
-      </div>
+        <CheckCell checked={!!block.dtp_completed} />
+        <CheckCell checked={!!block.paper_stacked} />
+        <CheckCell checked={!!block.plate_completed} />
+        <CheckCell checked={!!block.pp_processed} />
+        <CheckCell checked={!!block.printing_completed} />
 
-      <div className="grid grid-cols-[58px_1fr] border-b border-slate-200">
-        <div className="border-r border-slate-200 px-1 py-0.5 text-slate-500">色/通紙</div>
-        <div className="px-1 py-0.5">
-          {block.color_front ?? "-"}/{block.color_back ?? "-"}・{compactNumber(block.print_count)}
-        </div>
-      </div>
+        <Cell className="truncate">{block.unit_name}</Cell>
 
-      <div className="grid grid-cols-5 border-b border-slate-200 text-center text-[10px]">
-        <CheckMini label="DTP" checked={!!block.dtp_completed} />
-        <CheckMini label="紙" checked={!!block.paper_stacked} />
-        <CheckMini label="下版" checked={!!block.plate_completed} />
-        <CheckMini label="PP" checked={!!block.pp_processed} />
-        <CheckMini label="刷了" checked={!!block.printing_completed} />
-      </div>
+        <Cell>{block.plate_size ?? "-"}</Cell>
 
-      <div className="grid grid-cols-[1fr_auto] items-center">
-        <div className="px-1 py-0.5 text-[10px] text-slate-500">
-          {getStatusLabel(block.block_status)}
-        </div>
-        <div className="border-l border-slate-200 px-1 py-0.5 text-right font-medium">
-          {block.sequence_no ?? "-"}
-        </div>
+        <Cell>{formatColorCount(block)}</Cell>
+
+        <Cell className="text-right">{compactNumber(block.print_count)}</Cell>
       </div>
     </button>
-  );
+  )
 }
 
 function CheckMini({
