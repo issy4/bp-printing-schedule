@@ -525,17 +525,24 @@ export default function WeeklyScheduleBoard({
                         key={key}
                         className={`border border-slate-300 align-top p-0 ${day.date === today ? "bg-sky-50/40" : "bg-white"}`}
                       >
-                        <div className="min-h-[92px] space-y-[1px] bg-white">
+                        <div className="min-h-[92px] bg-white">
                           {loading ? (
-                            <div className="pt-6 text-center text-xs text-muted-foreground">読み込み中…</div>
+                            <div className="pt-6 text-center text-xs text-muted-foreground">
+                              読み込み中…
+                            </div>
                           ) : cell?.blocks.length ? (
-                            cell.blocks.map((block) => (
-                              <ScheduleCellItem
-                                key={block.block_id}
-                                block={block}
-                                onClick={() => setSelectedBlock(block)}
-                              />
-                            ))
+                            <>
+                              <ScheduleCellHeader />
+                              <div className="space-y-0">
+                                {cell.blocks.map((block) => (
+                                  <ScheduleCellItem
+                                    key={block.block_id}
+                                    block={block}
+                                    onClick={() => setSelectedBlock(block)}
+                                  />
+                                ))}
+                              </div>
+                            </>
                           ) : (
                             <div className="pt-6 text-center text-xs text-muted-foreground">-</div>
                           )}
@@ -581,68 +588,104 @@ export default function WeeklyScheduleBoard({
   );
 }
 
+function formatColorCount(item: ScheduleBlockRow) {
+  const front = item.color_front != null ? item.color_front : "-"
+  const back = item.color_back != null ? item.color_back : "-"
+  return `${front}/${back}`
+}
+
+export function ScheduleCellHeader() {
+  return (
+    <div className="grid grid-cols-[72px_1fr_34px_34px_34px_34px_34px_90px_58px_52px_70px] border-b border-slate-400 bg-slate-100 text-[10px] font-medium">
+      <div className="border-r border-slate-300 px-1 py-0.5">受注</div>
+      <div className="border-r border-slate-300 px-1 py-0.5">品名</div>
+      <div className="border-r border-slate-300 px-1 py-0.5 text-center">DTP</div>
+      <div className="border-r border-slate-300 px-1 py-0.5 text-center">紙</div>
+      <div className="border-r border-slate-300 px-1 py-0.5 text-center">下版</div>
+      <div className="border-r border-slate-300 px-1 py-0.5 text-center">PP</div>
+      <div className="border-r border-slate-300 px-1 py-0.5 text-center">刷了</div>
+      <div className="border-r border-slate-300 px-1 py-0.5">部品</div>
+      <div className="border-r border-slate-300 px-1 py-0.5">版型</div>
+      <div className="border-r border-slate-300 px-1 py-0.5">色数</div>
+      <div className="px-1 py-0.5">通紙</div>
+    </div>
+  )
+}
+
 export function ScheduleCellItem({
   block,
   onClick,
 }: {
-  block: ScheduleBlockRow;
-  onClick?: () => void;
+  block: ScheduleBlockRow
+  onClick?: () => void
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="block w-full rounded-none border-2 border-red-500 bg-yellow-50 text-left text-[11px] leading-tight hover:bg-slate-50"
+      className="block w-full border-b border-slate-300 bg-white text-left text-[11px] hover:bg-slate-50"
     >
-      <div className="grid grid-cols-[1fr_auto] border-b border-slate-300">
-        <div className="truncate px-1 py-0.5 font-semibold">{block.part_name}</div>
-        <div className="border-l border-slate-300 px-1 py-0.5 text-right">
-          {block.unit_name}
-        </div>
-      </div>
+      <div className="grid min-h-[28px] grid-cols-[72px_1fr_34px_34px_34px_34px_34px_90px_58px_52px_70px] items-stretch">
+        <Cell className="font-medium">{block.order_number ?? "-"}</Cell>
 
-      <div className="grid grid-cols-[58px_1fr] border-b border-slate-200">
-        <div className="border-r border-slate-200 px-1 py-0.5 text-slate-500">受注</div>
-        <div className="truncate px-1 py-0.5">{block.order_number ?? "-"}</div>
-      </div>
-
-      <div className="grid grid-cols-[58px_1fr] border-b border-slate-200">
-        <div className="border-r border-slate-200 px-1 py-0.5 text-slate-500">品名</div>
-        <div className="truncate px-1 py-0.5" title={block.product_name ?? ""}>
+        <Cell title={block.product_name ?? ""} className="truncate">
           {block.product_name ?? "-"}
-        </div>
-      </div>
+        </Cell>
 
-      <div className="grid grid-cols-[58px_1fr] border-b border-slate-200">
-        <div className="border-r border-slate-200 px-1 py-0.5 text-slate-500">版型</div>
-        <div className="px-1 py-0.5">{block.plate_size ?? "-"}</div>
-      </div>
+        <CheckCell checked={!!block.dtp_completed} />
+        <CheckCell checked={!!block.paper_stacked} />
+        <CheckCell checked={!!block.plate_completed} />
+        <CheckCell checked={!!block.pp_processed} />
+        <CheckCell checked={!!block.printing_completed} />
 
-      <div className="grid grid-cols-[58px_1fr] border-b border-slate-200">
-        <div className="border-r border-slate-200 px-1 py-0.5 text-slate-500">色/通紙</div>
-        <div className="px-1 py-0.5">
-          {block.color_front ?? "-"}/{block.color_back ?? "-"}・{compactNumber(block.print_count)}
-        </div>
-      </div>
+        <Cell className="truncate" title={block.unit_name}>
+          {block.unit_name}
+        </Cell>
 
-      <div className="grid grid-cols-5 border-b border-slate-200 text-center text-[10px]">
-        <CheckMini label="DTP" checked={!!block.dtp_completed} />
-        <CheckMini label="紙" checked={!!block.paper_stacked} />
-        <CheckMini label="下版" checked={!!block.plate_completed} />
-        <CheckMini label="PP" checked={!!block.pp_processed} />
-        <CheckMini label="刷了" checked={!!block.printing_completed} />
-      </div>
+        <Cell>{block.plate_size ?? "-"}</Cell>
 
-      <div className="grid grid-cols-[1fr_auto] items-center">
-        <div className="px-1 py-0.5 text-[10px] text-slate-500">
-          {getStatusLabel(block.block_status)}
-        </div>
-        <div className="border-l border-slate-200 px-1 py-0.5 text-right font-medium">
-          {block.sequence_no ?? "-"}
-        </div>
+        <Cell>{formatColorCount(block)}</Cell>
+
+        <Cell className="justify-end text-right">
+          {compactNumber(block.print_count)}
+        </Cell>
       </div>
     </button>
-  );
+  )
+}
+
+function Cell({
+  children,
+  className = "",
+  title,
+}: {
+  children: React.ReactNode
+  className?: string
+  title?: string
+}) {
+  return (
+    <div
+      title={title}
+      className={`flex items-center border-r border-slate-300 px-1 py-0.5 ${className}`}
+    >
+      {children}
+    </div>
+  )
+}
+
+function CheckCell({ checked }: { checked: boolean }) {
+  return (
+    <div className="flex items-center justify-center border-r border-slate-300 px-1 py-0.5">
+      <span
+        className={`inline-flex h-4 w-4 items-center justify-center border text-[10px] ${checked
+          ? "border-slate-800 bg-slate-800 text-white"
+          : "border-slate-400 bg-white text-transparent"
+          }`}
+      >
+        ✓
+      </span>
+    </div>
+  )
 }
 
 function CheckMini({
