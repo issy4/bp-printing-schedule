@@ -169,6 +169,19 @@ function compactNumber(value: number | null) {
   return value.toLocaleString("ja-JP");
 }
 
+function formatColorCount(item: ScheduleBlockRow) {
+  const front = item.color_front != null ? item.color_front : "-"
+  const back = item.color_back != null ? item.color_back : "-"
+  return `${front}/${back}`
+}
+
+function formatSpecialColor(item: ScheduleBlockRow) {
+  if (item.color_note && item.color_note.trim() !== "") {
+    return item.color_note
+  }
+  return "-"
+}
+
 function getStatusLabel(status: ScheduleBlockRow["block_status"]) {
   switch (status) {
     case "unassigned":
@@ -368,34 +381,72 @@ export default function WeeklyScheduleBoard({
               {filteredUnassigned.map((item) => (
                 <button
                   key={item.block_id}
-                  className="w-full p-0 text-left transition-colors hover:bg-slate-50"
+                  type="button"
+                  className="w-full p-0 text-left hover:bg-slate-50"
                   onClick={() => setSelectedBlock(item)}
                 >
-                  <div className="border-b border-slate-300 bg-white p-0">
-                    <div className="grid grid-cols-[1fr_auto] border-b border-slate-300">
-                      <div className="truncate px-2 py-1 font-semibold">{item.unit_name}</div>
-                      <div className="border-l border-slate-300 px-2 py-1 font-medium">詳細</div>
-                    </div>
-                    <div className="grid grid-cols-[70px_1fr_70px_1fr] text-[11px]">
-                      <div className="border-r border-b border-slate-200 px-2 py-1 text-slate-500">部品</div>
-                      <div className="border-r border-b border-slate-200 px-2 py-1">{item.part_name}</div>
-                      <div className="border-r border-b border-slate-200 px-2 py-1 text-slate-500">版型</div>
-                      <div className="border-b border-slate-200 px-2 py-1">{item.plate_size ?? "-"}</div>
-
-                      <div className="border-r border-b border-slate-200 px-2 py-1 text-slate-500">受注</div>
-                      <div className="border-r border-b border-slate-200 px-2 py-1">{item.order_number ?? "-"}</div>
-                      <div className="border-r border-b border-slate-200 px-2 py-1 text-slate-500">色/通紙</div>
-                      <div className="border-b border-slate-200 px-2 py-1">
-                        {item.color_front ?? "-"}/{item.color_back ?? "-"}・{compactNumber(item.print_count)}
-                      </div>
-
-                      <div className="border-r border-slate-200 px-2 py-1 text-slate-500">得意先</div>
-                      <div className="border-r border-slate-200 px-2 py-1 truncate" title={item.customer_name ?? ""}>
-                        {item.customer_name ?? "-"}
-                      </div>
-                      <div className="border-r border-slate-200 px-2 py-1 text-slate-500">品名</div>
-                      <div className="px-2 py-1 truncate" title={item.product_name ?? ""}>
+                  <div className="border-b border-slate-400 bg-white text-[12px] leading-tight">
+                    {/* 1段目 */}
+                    <div className="grid grid-cols-[1fr_84px] border-b border-slate-300">
+                      <div
+                        className="truncate px-2 py-1 font-bold"
+                        title={item.product_name ?? ""}
+                      >
                         {item.product_name ?? "-"}
+                      </div>
+                      <div className="border-l border-slate-300 px-2 py-1 text-center font-bold">
+                        詳細
+                      </div>
+                    </div>
+
+                    {/* 2段目 */}
+                    <div className="grid grid-cols-[58px_1fr_58px_1fr] border-b border-slate-300">
+                      <div className="border-r border-slate-300 px-2 py-1 text-slate-700">
+                        受注
+                      </div>
+                      <div className="border-r border-slate-300 px-2 py-1">
+                        {item.order_number ?? "-"}
+                      </div>
+                      <div className="border-r border-slate-300 px-2 py-1 text-slate-700">
+                        部品
+                      </div>
+                      <div className="px-2 py-1">
+                        {item.unit_name ?? "-"}
+                      </div>
+                    </div>
+
+                    {/* 3段目 */}
+                    <div className="grid grid-cols-[58px_1fr_58px_1fr] border-b border-slate-300">
+                      <div className="border-r border-slate-300 px-2 py-1 text-slate-700">
+                        色数
+                      </div>
+                      <div className="border-r border-slate-300 px-2 py-1">
+                        {formatColorCount(item)}
+                      </div>
+                      <div className="border-r border-slate-300 px-2 py-1 text-slate-700">
+                        特色
+                      </div>
+                      <div
+                        className="truncate px-2 py-1"
+                        title={item.color_note ?? ""}
+                      >
+                        {formatSpecialColor(item)}
+                      </div>
+                    </div>
+
+                    {/* 4段目 */}
+                    <div className="grid grid-cols-[58px_1fr_58px_1fr]">
+                      <div className="border-r border-slate-300 px-2 py-1 text-slate-700">
+                        版型
+                      </div>
+                      <div className="border-r border-slate-300 px-2 py-1">
+                        {item.plate_size ?? "-"}
+                      </div>
+                      <div className="border-r border-slate-300 px-2 py-1 text-slate-700">
+                        通紙
+                      </div>
+                      <div className="px-2 py-1">
+                        {compactNumber(item.print_count)}
                       </div>
                     </div>
                   </div>
