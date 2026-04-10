@@ -528,6 +528,9 @@ export default function WeeklyScheduleBoard({
       </Dialog>
     </div>
   );
+  <div className="bg-blue-600 p-3 text-white font-bold">
+    WeeklyScheduleBoard 確認用
+  </div>
 }
 
 export function ScheduleCellItem({
