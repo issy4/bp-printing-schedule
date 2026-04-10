@@ -581,12 +581,36 @@ export default function WeeklyScheduleBoard({
   );
 }
 
+function formatColorCount(item: ScheduleBlockRow) {
+  const front = item.color_front != null ? item.color_front : "-"
+  const back = item.color_back != null ? item.color_back : "-"
+  return `${front}/${back}`
+}
+
+export function ScheduleCellHeader() {
+  return (
+    <div className="grid grid-cols-[72px_1fr_34px_34px_34px_34px_34px_90px_58px_52px_70px] border-b border-slate-400 bg-slate-100 text-[10px] font-medium">
+      <div className="border-r border-slate-300 px-1 py-0.5">受注</div>
+      <div className="border-r border-slate-300 px-1 py-0.5">品名</div>
+      <div className="border-r border-slate-300 px-1 py-0.5 text-center">DTP</div>
+      <div className="border-r border-slate-300 px-1 py-0.5 text-center">紙</div>
+      <div className="border-r border-slate-300 px-1 py-0.5 text-center">下版</div>
+      <div className="border-r border-slate-300 px-1 py-0.5 text-center">PP</div>
+      <div className="border-r border-slate-300 px-1 py-0.5 text-center">刷了</div>
+      <div className="border-r border-slate-300 px-1 py-0.5">部品</div>
+      <div className="border-r border-slate-300 px-1 py-0.5">版型</div>
+      <div className="border-r border-slate-300 px-1 py-0.5">色数</div>
+      <div className="px-1 py-0.5">通紙</div>
+    </div>
+  )
+}
+
 export function ScheduleCellItem({
   block,
   onClick,
 }: {
-  block: ScheduleBlockRow;
-  onClick?: () => void;
+  block: ScheduleBlockRow
+  onClick?: () => void
 }) {
   return (
     <button
@@ -607,13 +631,17 @@ export function ScheduleCellItem({
         <CheckCell checked={!!block.pp_processed} />
         <CheckCell checked={!!block.printing_completed} />
 
-        <Cell className="truncate">{block.unit_name}</Cell>
+        <Cell className="truncate" title={block.unit_name}>
+          {block.unit_name}
+        </Cell>
 
         <Cell>{block.plate_size ?? "-"}</Cell>
 
         <Cell>{formatColorCount(block)}</Cell>
 
-        <Cell className="text-right">{compactNumber(block.print_count)}</Cell>
+        <Cell className="justify-end text-right">
+          {compactNumber(block.print_count)}
+        </Cell>
       </div>
     </button>
   )
