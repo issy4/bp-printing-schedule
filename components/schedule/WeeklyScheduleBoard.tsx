@@ -525,17 +525,24 @@ export default function WeeklyScheduleBoard({
                         key={key}
                         className={`border border-slate-300 align-top p-0 ${day.date === today ? "bg-sky-50/40" : "bg-white"}`}
                       >
-                        <div className="min-h-[92px] space-y-[1px] bg-white">
+                        <div className="min-h-[92px] bg-white">
                           {loading ? (
-                            <div className="pt-6 text-center text-xs text-muted-foreground">読み込み中…</div>
+                            <div className="pt-6 text-center text-xs text-muted-foreground">
+                              読み込み中…
+                            </div>
                           ) : cell?.blocks.length ? (
-                            cell.blocks.map((block) => (
-                              <ScheduleCellItem
-                                key={block.block_id}
-                                block={block}
-                                onClick={() => setSelectedBlock(block)}
-                              />
-                            ))
+                            <>
+                              <ScheduleCellHeader />
+                              <div className="space-y-0">
+                                {cell.blocks.map((block) => (
+                                  <ScheduleCellItem
+                                    key={block.block_id}
+                                    block={block}
+                                    onClick={() => setSelectedBlock(block)}
+                                  />
+                                ))}
+                              </div>
+                            </>
                           ) : (
                             <div className="pt-6 text-center text-xs text-muted-foreground">-</div>
                           )}
@@ -671,8 +678,8 @@ function CheckCell({ checked }: { checked: boolean }) {
     <div className="flex items-center justify-center border-r border-slate-300 px-1 py-0.5">
       <span
         className={`inline-flex h-4 w-4 items-center justify-center border text-[10px] ${checked
-            ? "border-slate-800 bg-slate-800 text-white"
-            : "border-slate-400 bg-white text-transparent"
+          ? "border-slate-800 bg-slate-800 text-white"
+          : "border-slate-400 bg-white text-transparent"
           }`}
       >
         ✓
