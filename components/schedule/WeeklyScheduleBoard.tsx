@@ -619,6 +619,40 @@ export function ScheduleCellItem({
   )
 }
 
+function Cell({
+  children,
+  className = "",
+  title,
+}: {
+  children: React.ReactNode
+  className?: string
+  title?: string
+}) {
+  return (
+    <div
+      title={title}
+      className={`flex items-center border-r border-slate-300 px-1 py-0.5 ${className}`}
+    >
+      {children}
+    </div>
+  )
+}
+
+function CheckCell({ checked }: { checked: boolean }) {
+  return (
+    <div className="flex items-center justify-center border-r border-slate-300 px-1 py-0.5">
+      <span
+        className={`inline-flex h-4 w-4 items-center justify-center border text-[10px] ${checked
+            ? "border-slate-800 bg-slate-800 text-white"
+            : "border-slate-400 bg-white text-transparent"
+          }`}
+      >
+        ✓
+      </span>
+    </div>
+  )
+}
+
 function CheckMini({
   label,
   checked,
