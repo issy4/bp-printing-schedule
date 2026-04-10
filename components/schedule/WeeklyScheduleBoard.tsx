@@ -169,6 +169,19 @@ function compactNumber(value: number | null) {
   return value.toLocaleString("ja-JP");
 }
 
+function formatColorCount(item: ScheduleBlockRow) {
+  const front = item.color_front != null ? item.color_front : "-"
+  const back = item.color_back != null ? item.color_back : "-"
+  return `${front}/${back}`
+}
+
+function formatSpecialColor(item: ScheduleBlockRow) {
+  if (item.color_note && item.color_note.trim() !== "") {
+    return item.color_note
+  }
+  return "-"
+}
+
 function getStatusLabel(status: ScheduleBlockRow["block_status"]) {
   switch (status) {
     case "unassigned":
