@@ -590,18 +590,21 @@ function formatColorCount(item: ScheduleBlockRow) {
 
 export function ScheduleCellHeader() {
   return (
-    <div className="grid grid-cols-[72px_1fr_34px_34px_34px_34px_34px_90px_58px_52px_70px] border-b border-slate-400 bg-slate-100 text-[10px] font-medium">
+    <div className="grid grid-cols-[72px_220px_34px_34px_34px_34px_34px_92px_58px_52px_90px_72px_72px_72px] border-b border-slate-400 bg-slate-100 text-[10px] font-medium">
       <div className="border-r border-slate-300 px-1 py-0.5">受注</div>
       <div className="border-r border-slate-300 px-1 py-0.5">品名</div>
       <div className="border-r border-slate-300 px-1 py-0.5 text-center">DTP</div>
       <div className="border-r border-slate-300 px-1 py-0.5 text-center">紙</div>
       <div className="border-r border-slate-300 px-1 py-0.5 text-center">下版</div>
       <div className="border-r border-slate-300 px-1 py-0.5 text-center">PP</div>
-      <div className="border-r border-slate-300 px-1 py-0.5 text-center">刷了</div>
       <div className="border-r border-slate-300 px-1 py-0.5">部品</div>
       <div className="border-r border-slate-300 px-1 py-0.5">版型</div>
       <div className="border-r border-slate-300 px-1 py-0.5">色数</div>
-      <div className="px-1 py-0.5">通紙</div>
+      <div className="border-r border-slate-300 px-1 py-0.5">特色</div>
+      <div className="border-r border-slate-300 px-1 py-0.5">通紙</div>
+      <div className="border-r border-slate-300 px-1 py-0.5">特記</div>
+      <div className="px-1 py-0.5">作業時間</div>
+      <div className="border-r border-slate-300 px-1 py-0.5 text-center">刷了</div>
     </div>
   )
 }
