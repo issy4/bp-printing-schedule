@@ -176,6 +176,9 @@ function formatSpecialColor(item: ScheduleBlockRow) {
   return "-"
 }
 
+const SCHEDULE_CELL_GRID =
+  "grid-cols-[72px_240px_34px_34px_34px_34px_90px_58px_52px_90px_72px_90px_90px_34px]"
+  
 function getStatusLabel(status: ScheduleBlockRow["block_status"]) {
   switch (status) {
     case "unassigned":
