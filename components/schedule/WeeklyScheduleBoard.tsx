@@ -457,6 +457,15 @@ export default function WeeklyScheduleBoard({
     return true
   }
 
+  async function refreshDataSilently(date?: string) {
+    try {
+      const next = await fetchWeeklyCalendarData(date ?? baseDate)
+      setData(next)
+    } catch {
+      // 楽観的更新後の同期に失敗しても、操作自体は成功している可能性があるため表示は維持します
+    }
+  }
+
   async function handleAssignBlockToCell({
     block,
     machineId,
@@ -470,6 +479,17 @@ export default function WeeklyScheduleBoard({
   }) {
     if (!block) return
 
+    const previousData = data
+
+    setData((current) =>
+      moveBlockInCalendarData(current, block, {
+        machineId,
+        date,
+        shiftCategory,
+      }),
+    )
+    setSelectedUnassignedBlock(null)
+
     const ok = await updateBlockAssignment({
       block,
       machineId,
@@ -477,10 +497,12 @@ export default function WeeklyScheduleBoard({
       shiftCategory,
     })
 
-    if (!ok) return
+    if (!ok) {
+      setData(previousData)
+      return
+    }
 
-    setSelectedUnassignedBlock(null)
-    await loadData(baseDate)
+    await refreshDataSilently(baseDate)
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -496,7 +518,18 @@ export default function WeeklyScheduleBoard({
 
     if (!dragData?.block || !dropData) return
 
+    const previousData = data
+
     if (dropData.type === "schedule-cell") {
+      setData((current) =>
+        moveBlockInCalendarData(current, dragData.block, {
+          machineId: dropData.machineId,
+          date: dropData.date,
+          shiftCategory: dropData.shiftCategory,
+        }),
+      )
+      setSelectedUnassignedBlock(null)
+
       const ok = await updateBlockAssignment({
         block: dragData.block,
         machineId: dropData.machineId,
@@ -504,14 +537,25 @@ export default function WeeklyScheduleBoard({
         shiftCategory: dropData.shiftCategory,
       })
 
-      if (ok) {
-        setSelectedUnassignedBlock(null)
-        await loadData(baseDate)
+      if (!ok) {
+        setData(previousData)
+        return
       }
+
+      await refreshDataSilently(baseDate)
       return
     }
 
     if (dropData.type === "unassigned-area" && dragData.source === "assigned") {
+      setData((current) =>
+        moveBlockInCalendarData(current, dragData.block, {
+          machineId: null,
+          date: null,
+          shiftCategory: null,
+        }),
+      )
+      setSelectedBlock(null)
+
       const ok = await updateBlockAssignment({
         block: dragData.block,
         machineId: null,
@@ -519,15 +563,28 @@ export default function WeeklyScheduleBoard({
         shiftCategory: null,
       })
 
-      if (ok) {
-        setSelectedBlock(null)
-        await loadData(baseDate)
+      if (!ok) {
+        setData(previousData)
+        return
       }
+
+      await refreshDataSilently(baseDate)
     }
   }
 
   async function handleUnassignBlock(block: ScheduleBlockRow) {
     if (!confirm("この案件を未割当に戻しますか？")) return
+
+    const previousData = data
+
+    setData((current) =>
+      moveBlockInCalendarData(current, block, {
+        machineId: null,
+        date: null,
+        shiftCategory: null,
+      }),
+    )
+    setSelectedBlock(null)
 
     const ok = await updateBlockAssignment({
       block,
@@ -536,10 +593,12 @@ export default function WeeklyScheduleBoard({
       shiftCategory: null,
     })
 
-    if (!ok) return
+    if (!ok) {
+      setData(previousData)
+      return
+    }
 
-    setSelectedBlock(null)
-    await loadData(baseDate)
+    await refreshDataSilently(baseDate)
   }
 
   return (
@@ -811,6 +870,67 @@ function updateBlockInCalendarData(
   )
 
   return { ...current, cells: nextCells, unassignedBlocks: nextUnassignedBlocks }
+}
+
+function moveBlockInCalendarData(
+  current: WeeklyCalendarData,
+  block: ScheduleBlockRow,
+  target: {
+    machineId: string | null
+    date: string | null
+    shiftCategory: "day" | "night" | null
+  },
+): WeeklyCalendarData {
+  const isUnassign = !target.machineId || !target.date || !target.shiftCategory
+
+  const movedBlock: ScheduleBlockRow = {
+    ...block,
+    machine_id: target.machineId,
+    scheduled_date: target.date,
+    shift_category: target.shiftCategory,
+    block_status: isUnassign ? "unassigned" : "assigned",
+    unit_status: isUnassign ? "unassigned" : "assigned",
+    machine_name: isUnassign ? null : block.machine_name,
+    shift_label: target.shiftCategory === "day" ? "日勤" : target.shiftCategory === "night" ? "夜勤" : "",
+    shift_sort_order: target.shiftCategory === "day" ? 1 : target.shiftCategory === "night" ? 2 : 99,
+  }
+
+  const nextCells: Record<string, WeeklyCalendarCell> = {}
+
+  for (const key of Object.keys(current.cells)) {
+    nextCells[key] = {
+      ...current.cells[key],
+      blocks: current.cells[key].blocks.filter((b) => b.block_id !== block.block_id),
+    }
+  }
+
+  let nextUnassignedBlocks = current.unassignedBlocks.filter((b) => b.block_id !== block.block_id)
+
+  if (isUnassign) {
+    nextUnassignedBlocks = [movedBlock, ...nextUnassignedBlocks]
+  } else {
+    const key = makeCellKey(target.machineId!, target.shiftCategory!, target.date!)
+
+    if (!nextCells[key]) {
+      nextCells[key] = {
+        machine_id: target.machineId!,
+        shift_category: target.shiftCategory!,
+        date: target.date!,
+        blocks: [],
+      }
+    }
+
+    nextCells[key] = {
+      ...nextCells[key],
+      blocks: [...nextCells[key].blocks, movedBlock],
+    }
+  }
+
+  return {
+    ...current,
+    cells: nextCells,
+    unassignedBlocks: nextUnassignedBlocks,
+  }
 }
 
 export function ScheduleCellHeader() {
