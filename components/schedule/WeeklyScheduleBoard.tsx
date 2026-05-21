@@ -590,7 +590,7 @@ function formatColorCount(item: ScheduleBlockRow) {
 
 export function ScheduleCellHeader() {
   return (
-    <div className="grid grid-cols-[72px_220px_34px_34px_34px_34px_34px_92px_58px_52px_90px_72px_72px_72px] border-b border-slate-400 bg-slate-100 text-[10px] font-medium">
+    <div className={`grid ${SCHEDULE_CELL_GRID} border-b border-slate-400 bg-slate-100 text-[10px] font-medium`}>
       <div className="border-r border-slate-300 px-1 py-0.5">受注</div>
       <div className="border-r border-slate-300 px-1 py-0.5">品名</div>
       <div className="border-r border-slate-300 px-1 py-0.5 text-center">DTP</div>
@@ -601,9 +601,9 @@ export function ScheduleCellHeader() {
       <div className="border-r border-slate-300 px-1 py-0.5">版型</div>
       <div className="border-r border-slate-300 px-1 py-0.5">色数</div>
       <div className="border-r border-slate-300 px-1 py-0.5">特色</div>
-      <div className="border-r border-slate-300 px-1 py-0.5">通紙</div>
+      <div className="border-r border-slate-300 px-1 py-0.5 text-right">通紙</div>
       <div className="border-r border-slate-300 px-1 py-0.5">特記</div>
-      <div className="px-1 py-0.5">作業時間</div>
+      <div className="border-r border-slate-300 px-1 py-0.5">作業時間</div>
       <div className="border-r border-slate-300 px-1 py-0.5 text-center">刷了</div>
     </div>
   )
@@ -622,7 +622,7 @@ export function ScheduleCellItem({
       onClick={onClick}
       className="block w-full border-b border-slate-300 bg-white text-left text-[11px] hover:bg-slate-50"
     >
-      <div className="grid min-h-[28px] grid-cols-[72px_220px_34px_34px_34px_34px_34px_92px_58px_52px_90px_72px_72px_72px] items-stretch">
+      <div className={`grid min-h-[28px] ${SCHEDULE_CELL_GRID} items-stretch`}>
         <Cell className="font-medium">{block.order_number ?? "-"}</Cell>
 
         <Cell title={block.product_name ?? ""} className="truncate">
@@ -633,7 +633,6 @@ export function ScheduleCellItem({
         <CheckCell checked={!!block.paper_stacked} />
         <CheckCell checked={!!block.plate_completed} />
         <CheckCell checked={!!block.pp_processed} />
-        <CheckCell checked={!!block.printing_completed} />
 
         <Cell className="truncate" title={block.unit_name}>
           {block.unit_name}
@@ -651,13 +650,11 @@ export function ScheduleCellItem({
           {compactNumber(block.print_count)}
         </Cell>
 
-        <Cell className="text-slate-400">
-          -
-        </Cell>
+        <Cell className="text-slate-400 bg-slate-50">-</Cell>
 
-        <Cell className="text-slate-400">
-          -
-        </Cell>
+        <Cell className="text-slate-400 bg-slate-50">-</Cell>
+
+        <CheckCell checked={!!block.printing_completed} />
       </div>
     </button>
   )
