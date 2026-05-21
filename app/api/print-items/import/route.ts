@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
       const pressCount = item.press_count && item.press_count > 0 ? item.press_count : 1
 
       // 1. print_items 作成
+      // print_units / schedule_blocks はDBトリガーで自動作成される
       const { data: printItem, error: printItemError } = await supabase
         .from("print_items")
         .insert({
@@ -81,16 +82,18 @@ export async function POST(request: NextRequest) {
       }
 
       // 2. print_item_details 作成
-      const { error: detailError } = await supabase
+      const { data: detail, error: detailError } = await supabase
         .from("print_item_details")
         .insert({
-  print_item_id: printItem.id,
-  dtp_completed: false,
-  paper_stacked: false,
-  plate_completed: false,
-  pp_processed: false,
-  printing_completed: false,
-})
+          print_item_id: printItem.id,
+          dtp_completed: false,
+          paper_stacked: false,
+          plate_completed: false,
+          pp_processed: false,
+          printing_completed: false,
+        })
+        .select()
+        .single()
 
       if (detailError) {
         return NextResponse.json(
@@ -99,19 +102,12 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // 3. print_units 作成
-      const unitRows = Array.from({ length: pressCount }).map((_, index) => ({
-        print_item_id: printItem.id,
-        unit_no: index + 1,
-        unit_name: `${item.part_name}-${index + 1}`,
-        status: "unassigned",
-        printing_completed: false,
-      }))
-
+      // 3. トリガーで作成済みの print_units を取得
       const { data: printUnits, error: unitError } = await supabase
         .from("print_units")
-        .insert(unitRows)
-        .select()
+        .select("*")
+        .eq("print_item_id", printItem.id)
+        .order("unit_no", { ascending: true })
 
       if (unitError) {
         return NextResponse.json(
@@ -120,23 +116,14 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // 4. schedule_blocks 作成
-      const scheduleRows = (printUnits ?? []).map((unit) => ({
-        print_unit_id: unit.id,
-        block_no: 1,
-        scheduled_date: null,
-        machine_id: null,
-        shift_category: null,
-        sequence_no: null,
-        planned_print_count: item.print_count ?? null,
-        note: null,
-        status: "unassigned",
-      }))
+      const unitIds = (printUnits ?? []).map((unit) => unit.id)
 
+      // 4. トリガーで作成済みの schedule_blocks を取得
       const { data: scheduleBlocks, error: scheduleError } = await supabase
         .from("schedule_blocks")
-        .insert(scheduleRows)
-        .select()
+        .select("*")
+        .in("print_unit_id", unitIds)
+        .order("block_no", { ascending: true })
 
       if (scheduleError) {
         return NextResponse.json(
@@ -147,6 +134,7 @@ export async function POST(request: NextRequest) {
 
       createdItems.push({
         print_item: printItem,
+        print_item_detail: detail,
         print_units: printUnits,
         schedule_blocks: scheduleBlocks,
       })
