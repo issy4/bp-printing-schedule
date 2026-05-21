@@ -337,38 +337,7 @@ export default function WeeklyScheduleBoard({
   ) {
     const previousData = data
 
-    setData((current) => {
-      const nextCells: Record<string, WeeklyCalendarCell> = {}
-
-      for (const key of Object.keys(current.cells)) {
-        nextCells[key] = {
-          ...current.cells[key],
-          blocks: current.cells[key].blocks.map((b) =>
-            b.print_item_id === block.print_item_id
-              ? {
-                  ...b,
-                  [field]: checked,
-                }
-              : b,
-          ),
-        }
-      }
-
-      const nextUnassignedBlocks = current.unassignedBlocks.map((b) =>
-        b.print_item_id === block.print_item_id
-          ? {
-              ...b,
-              [field]: checked,
-            }
-          : b,
-      )
-
-      return {
-        ...current,
-        cells: nextCells,
-        unassignedBlocks: nextUnassignedBlocks,
-      }
-    })
+    setData((current) => updateBlockInCalendarData(current, block, { [field]: checked }))
 
     const res = await fetch(
       `/api/schedule/print-item/${block.print_item_id}/progress`,
@@ -386,6 +355,31 @@ export default function WeeklyScheduleBoard({
     if (!res.ok) {
       setData(previousData)
       alert("進捗の保存に失敗しました。")
+    }
+  }
+
+  async function handleSaveNote(block: ScheduleBlockRow, note: string) {
+    const previousData = data
+
+    setData((current) =>
+      updateBlockInCalendarData(current, block, {
+        block_note: note,
+      }),
+    )
+
+    const res = await fetch(`/api/schedule/block/${block.block_id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        note,
+      }),
+    })
+
+    if (!res.ok) {
+      setData(previousData)
+      alert("特記の保存に失敗しました。")
     }
   }
 
@@ -604,6 +598,7 @@ export default function WeeklyScheduleBoard({
                                     onToggleProgress={(field, checked) =>
                                       handleToggleProgress(block, field, checked)
                                     }
+                                    onSaveNote={(note) => handleSaveNote(block, note)}
                                   />
                                 ))}
                               </div>
@@ -652,6 +647,7 @@ export default function WeeklyScheduleBoard({
                 label="通紙"
                 value={selectedBlock.print_count?.toLocaleString("ja-JP")}
               />
+              <Info label="特記" value={selectedBlock.block_note} />
               <Info label="台数" value={String(selectedBlock.press_count)} />
               <Info label="印刷機" value={selectedBlock.machine_name} />
               <Info label="日付" value={selectedBlock.scheduled_date} />
@@ -667,6 +663,43 @@ export default function WeeklyScheduleBoard({
       </Dialog>
     </div>
   )
+}
+
+function updateBlockInCalendarData(
+  current: WeeklyCalendarData,
+  target: ScheduleBlockRow,
+  patch: Partial<ScheduleBlockRow>,
+): WeeklyCalendarData {
+  const nextCells: Record<string, WeeklyCalendarCell> = {}
+
+  for (const key of Object.keys(current.cells)) {
+    nextCells[key] = {
+      ...current.cells[key],
+      blocks: current.cells[key].blocks.map((b) =>
+        b.block_id === target.block_id || b.print_item_id === target.print_item_id
+          ? {
+              ...b,
+              ...patch,
+            }
+          : b,
+      ),
+    }
+  }
+
+  const nextUnassignedBlocks = current.unassignedBlocks.map((b) =>
+    b.block_id === target.block_id || b.print_item_id === target.print_item_id
+      ? {
+          ...b,
+          ...patch,
+        }
+      : b,
+  )
+
+  return {
+    ...current,
+    cells: nextCells,
+    unassignedBlocks: nextUnassignedBlocks,
+  }
 }
 
 export function ScheduleCellHeader() {
@@ -696,10 +729,12 @@ export function ScheduleCellItem({
   block,
   onClick,
   onToggleProgress,
+  onSaveNote,
 }: {
   block: ScheduleBlockRow
   onClick?: () => void
   onToggleProgress?: (field: ProgressField, checked: boolean) => void
+  onSaveNote?: (note: string) => void
 }) {
   return (
     <div
@@ -764,7 +799,7 @@ export function ScheduleCellItem({
           {compactNumber(block.print_count)}
         </Cell>
 
-        <Cell className="bg-slate-50 text-slate-400">-</Cell>
+        <NoteCell value={block.block_note} onSave={(value) => onSaveNote?.(value)} />
 
         <Cell className="bg-slate-50 text-slate-400">-</Cell>
 
@@ -794,6 +829,62 @@ function Cell({
       className={`flex items-center border-r border-slate-300 px-1 py-0.5 ${className}`}
     >
       {children}
+    </div>
+  )
+}
+
+function NoteCell({
+  value,
+  onSave,
+}: {
+  value?: string | null
+  onSave?: (value: string) => void
+}) {
+  const [editing, setEditing] = React.useState(false)
+  const [text, setText] = React.useState(value ?? "")
+
+  React.useEffect(() => {
+    setText(value ?? "")
+  }, [value])
+
+  const save = () => {
+    setEditing(false)
+    onSave?.(text)
+  }
+
+  if (editing) {
+    return (
+      <div className="border-r border-slate-300 bg-white px-1 py-0.5">
+        <input
+          autoFocus
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={save}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            e.stopPropagation()
+            if (e.key === "Enter") save()
+            if (e.key === "Escape") {
+              setText(value ?? "")
+              setEditing(false)
+            }
+          }}
+          className="h-5 w-full border border-slate-300 px-1 text-[11px] outline-none"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      onClick={(e) => {
+        e.stopPropagation()
+        setEditing(true)
+      }}
+      className="flex items-center border-r border-slate-300 bg-slate-50 px-1 py-0.5 text-slate-700"
+      title={value ?? ""}
+    >
+      <span className="truncate">{value || "-"}</span>
     </div>
   )
 }
