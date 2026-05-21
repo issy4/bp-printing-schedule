@@ -20,10 +20,13 @@ import { Search, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react"
 import {
   DndContext,
   DragOverlay,
+  PointerSensor,
   type DragEndEvent,
   type DragStartEvent,
   useDraggable,
   useDroppable,
+  useSensor,
+  useSensors,
 } from "@dnd-kit/core"
 
 export type ShiftCategory = "day" | "night" | null
@@ -285,6 +288,14 @@ export default function WeeklyScheduleBoard({
     React.useState<ScheduleBlockRow | null>(null)
   const [draggingBlock, setDraggingBlock] = React.useState<ScheduleBlockRow | null>(null)
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+  )
+
   const loadData = React.useCallback(
     async (date?: string) => {
       try {
@@ -532,7 +543,7 @@ export default function WeeklyScheduleBoard({
   }
 
   return (
-    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="grid h-full min-h-[760px] grid-cols-[420px_1fr] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
         <DroppableUnassignedArea active={!!draggingBlock && !!draggingBlock.machine_id}>
           <aside className="flex h-full flex-col border-r bg-white">
@@ -1068,6 +1079,7 @@ function NoteCell({
         <input
           autoFocus
           value={text}
+          onPointerDown={(e) => e.stopPropagation()}
           onChange={(e) => setText(e.target.value)}
           onBlur={save}
           onClick={(e) => e.stopPropagation()}
@@ -1087,6 +1099,7 @@ function NoteCell({
 
   return (
     <div
+      onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => {
         e.stopPropagation()
         setEditing(true)
@@ -1110,6 +1123,7 @@ function CheckCell({
     <div className="flex items-center justify-center border-r border-slate-300 px-1 py-0.5">
       <button
         type="button"
+        onPointerDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation()
           onToggle?.()
