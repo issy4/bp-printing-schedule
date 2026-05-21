@@ -256,6 +256,8 @@ export default function WeeklyScheduleBoard({
   const [machineFilter, setMachineFilter] = React.useState<string>("all")
   const [selectedBlock, setSelectedBlock] =
     React.useState<ScheduleBlockRow | null>(null)
+  const [selectedUnassignedBlock, setSelectedUnassignedBlock] =
+    React.useState<ScheduleBlockRow | null>(null)
 
   const loadData = React.useCallback(
     async (date?: string) => {
@@ -383,6 +385,41 @@ export default function WeeklyScheduleBoard({
     }
   }
 
+  async function handleAssignBlockToCell({
+    block,
+    machineId,
+    date,
+    shiftCategory,
+  }: {
+    block: ScheduleBlockRow | null
+    machineId: string
+    date: string
+    shiftCategory: "day" | "night"
+  }) {
+    if (!block) return
+
+    const res = await fetch(`/api/schedule/block/${block.block_id}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        machine_id: machineId,
+        scheduled_date: date,
+        shift_category: shiftCategory,
+        status: "assigned",
+      }),
+    })
+
+    if (!res.ok) {
+      alert("割当の保存に失敗しました。")
+      return
+    }
+
+    setSelectedUnassignedBlock(null)
+    await loadData(baseDate)
+  }
+
   return (
     <div className="grid h-full min-h-[760px] grid-cols-[420px_1fr] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
       <aside className="flex h-full flex-col border-r bg-white">
@@ -409,6 +446,29 @@ export default function WeeklyScheduleBoard({
               未割当のみ
             </Button>
           </div>
+
+          {selectedUnassignedBlock ? (
+            <div className="mt-3 rounded-md border border-blue-300 bg-blue-50 p-2 text-xs text-blue-900">
+              <div className="font-bold">選択中</div>
+              <div className="mt-1 truncate" title={selectedUnassignedBlock.product_name ?? ""}>
+                {selectedUnassignedBlock.unit_name} / {selectedUnassignedBlock.product_name ?? "-"}
+              </div>
+              <div className="mt-2 flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedUnassignedBlock(null)}
+                >
+                  選択解除
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
+              未割当案件を選択してから、右の予定セルをクリックすると割当できます。
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -422,8 +482,8 @@ export default function WeeklyScheduleBoard({
                 <button
                   key={item.block_id}
                   type="button"
-                  className="w-full p-0 text-left hover:bg-slate-50"
-                  onClick={() => setSelectedBlock(item)}
+                  className={`w-full p-0 text-left hover:bg-slate-50 ${selectedUnassignedBlock?.block_id === item.block_id ? "bg-blue-50 ring-2 ring-blue-400" : ""}`
+                  onClick={() => setSelectedUnassignedBlock(item)}
                 >
                   <div className="border-b border-slate-400 bg-white text-[12px] leading-tight">
                     <div className="grid grid-cols-[1fr_84px] border-b border-slate-300">
@@ -581,7 +641,17 @@ export default function WeeklyScheduleBoard({
                           day.date === today ? "bg-sky-50/40" : "bg-white"
                         }`}
                       >
-                        <div className="min-h-[92px] bg-white">
+                        <div
+                          className={`min-h-[92px] bg-white ${selectedUnassignedBlock ? "cursor-copy hover:bg-blue-50" : ""}`}
+                          onClick={() =>
+                            handleAssignBlockToCell({
+                              block: selectedUnassignedBlock,
+                              machineId: row.machine_id,
+                              date: day.date,
+                              shiftCategory: row.shift_category,
+                            })
+                          }
+                        >
                           {loading ? (
                             <div className="pt-6 text-center text-xs text-muted-foreground">
                               読み込み中…
