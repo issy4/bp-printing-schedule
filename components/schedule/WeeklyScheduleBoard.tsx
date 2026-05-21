@@ -162,7 +162,7 @@ type UnassignedDropData = {
 }
 
 const SCHEDULE_CELL_GRID =
-  "grid-cols-[72px_240px_34px_34px_34px_34px_90px_58px_52px_90px_72px_90px_90px_34px]"
+  "grid-cols-[44px_72px_240px_34px_34px_34px_34px_90px_58px_52px_90px_72px_90px_90px_34px]"
 
 function formatDateJP(dateStr: string) {
   const d = new Date(dateStr)
@@ -415,6 +415,58 @@ export default function WeeklyScheduleBoard({
     }
   }
 
+  async function handleMoveBlockOrder(block: ScheduleBlockRow, direction: "up" | "down") {
+    if (!block.machine_id || !block.scheduled_date || !block.shift_category) return
+
+    const key = makeCellKey(block.machine_id, block.shift_category, block.scheduled_date)
+    const currentCell = data.cells[key]
+    if (!currentCell) return
+
+    const sortedBlocks = [...currentCell.blocks].sort((a, b) => {
+      const seqA = a.sequence_no ?? 9999
+      const seqB = b.sequence_no ?? 9999
+      if (seqA !== seqB) return seqA - seqB
+      return a.unit_name.localeCompare(b.unit_name, "ja")
+    })
+
+    const currentIndex = sortedBlocks.findIndex((b) => b.block_id === block.block_id)
+    if (currentIndex < 0) return
+
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1
+    if (targetIndex < 0 || targetIndex >= sortedBlocks.length) return
+
+    const currentBlock = sortedBlocks[currentIndex]
+    const targetBlock = sortedBlocks[targetIndex]
+    const currentSeq = currentBlock.sequence_no ?? currentIndex + 1
+    const targetSeq = targetBlock.sequence_no ?? targetIndex + 1
+    const previousData = data
+
+    setData((current) =>
+      swapBlockSequenceInCalendarData(current, currentBlock, targetBlock, currentSeq, targetSeq),
+    )
+
+    const [resA, resB] = await Promise.all([
+      fetch(`/api/schedule/block/${currentBlock.block_id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sequence_no: targetSeq }),
+      }),
+      fetch(`/api/schedule/block/${targetBlock.block_id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sequence_no: currentSeq }),
+      }),
+    ])
+
+    if (!resA.ok || !resB.ok) {
+      setData(previousData)
+      alert("順番の保存に失敗しました。")
+      return
+    }
+
+    await refreshDataSilently(baseDate)
+  }
+
   async function updateBlockAssignment({
     block,
     machineId,
@@ -483,6 +535,7 @@ export default function WeeklyScheduleBoard({
     if (!block) return
 
     const previousData = data
+    const sequenceNo = getNextSequenceNo(data, machineId, shiftCategory, date, block.block_id)
 
     setData((current) =>
       moveBlockInCalendarData(current, block, {
@@ -493,8 +546,6 @@ export default function WeeklyScheduleBoard({
       }),
     )
     setSelectedUnassignedBlock(null)
-
-    const sequenceNo = getNextSequenceNo(data, machineId, shiftCategory, date, block.block_id)
 
     const ok = await updateBlockAssignment({
       block,
@@ -735,7 +786,7 @@ export default function WeeklyScheduleBoard({
                   {data.weekDays.map((day) => (
                     <th
                       key={day.date}
-                      className={`border border-slate-300 px-1 py-1 text-center font-bold min-w-[1100px] ${
+                      className={`border border-slate-300 px-1 py-1 text-center font-bold min-w-[1150px] ${
                         day.date === today ? "bg-sky-50" : "bg-[#f7f7f7]"
                       }`}
                     >
@@ -784,10 +835,14 @@ export default function WeeklyScheduleBoard({
                               <>
                                 <ScheduleCellHeader />
                                 <div className="space-y-0">
-                                  {cell.blocks.map((block) => (
+                                  {cell.blocks.map((block, index) => (
                                     <DraggableBlock key={block.block_id} block={block} source="assigned">
                                       <ScheduleCellItem
                                         block={block}
+                                        canMoveUp={index > 0}
+                                        canMoveDown={index < cell.blocks.length - 1}
+                                        onMoveUp={() => handleMoveBlockOrder(block, "up")}
+                                        onMoveDown={() => handleMoveBlockOrder(block, "down")}
                                         onClick={() => setSelectedBlock(block)}
                                         onToggleProgress={(field, checked) => handleToggleProgress(block, field, checked)}
                                         onSaveNote={(note) => handleSaveNote(block, note)}
@@ -889,6 +944,39 @@ function updateBlockInCalendarData(
   return { ...current, cells: nextCells, unassignedBlocks: nextUnassignedBlocks }
 }
 
+function swapBlockSequenceInCalendarData(
+  current: WeeklyCalendarData,
+  blockA: ScheduleBlockRow,
+  blockB: ScheduleBlockRow,
+  seqA: number,
+  seqB: number,
+): WeeklyCalendarData {
+  const nextCells: Record<string, WeeklyCalendarCell> = {}
+
+  for (const key of Object.keys(current.cells)) {
+    const blocks = current.cells[key].blocks.map((b) => {
+      if (b.block_id === blockA.block_id) return { ...b, sequence_no: seqB }
+      if (b.block_id === blockB.block_id) return { ...b, sequence_no: seqA }
+      return b
+    })
+
+    nextCells[key] = {
+      ...current.cells[key],
+      blocks: blocks.sort((a, b) => {
+        const seqAValue = a.sequence_no ?? 9999
+        const seqBValue = b.sequence_no ?? 9999
+        if (seqAValue !== seqBValue) return seqAValue - seqBValue
+        return a.unit_name.localeCompare(b.unit_name, "ja")
+      }),
+    }
+  }
+
+  return {
+    ...current,
+    cells: nextCells,
+  }
+}
+
 function getNextSequenceNo(
   current: WeeklyCalendarData,
   machineId: string,
@@ -979,6 +1067,7 @@ function moveBlockInCalendarData(
 export function ScheduleCellHeader() {
   return (
     <div className={`grid ${SCHEDULE_CELL_GRID} border-b border-slate-400 bg-slate-100 text-[10px] font-medium`}>
+      <div className="border-r border-slate-300 px-1 py-0.5 text-center">順</div>
       <div className="border-r border-slate-300 px-1 py-0.5">受注</div>
       <div className="border-r border-slate-300 px-1 py-0.5">品名</div>
       <div className="border-r border-slate-300 px-1 py-0.5 text-center">DTP</div>
@@ -999,11 +1088,19 @@ export function ScheduleCellHeader() {
 
 export function ScheduleCellItem({
   block,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
   onClick,
   onToggleProgress,
   onSaveNote,
 }: {
   block: ScheduleBlockRow
+  canMoveUp?: boolean
+  canMoveDown?: boolean
+  onMoveUp?: () => void
+  onMoveDown?: () => void
   onClick?: () => void
   onToggleProgress?: (field: ProgressField, checked: boolean) => void
   onSaveNote?: (note: string) => void
@@ -1025,6 +1122,12 @@ export function ScheduleCellItem({
       className="block w-full cursor-pointer border-b border-slate-300 bg-white text-left text-[11px] hover:bg-slate-50"
     >
       <div className={`grid min-h-[28px] ${SCHEDULE_CELL_GRID} items-stretch`}>
+        <OrderMoveCell
+          canMoveUp={!!canMoveUp}
+          canMoveDown={!!canMoveDown}
+          onMoveUp={onMoveUp}
+          onMoveDown={onMoveDown}
+        />
         <Cell className="font-medium">{block.order_number ?? "-"}</Cell>
         <Cell title={block.product_name ?? ""} className="truncate">{block.product_name ?? "-"}</Cell>
         <CheckCell checked={!!block.dtp_completed} onToggle={() => onToggleProgress?.("dtp_completed", !block.dtp_completed)} />
@@ -1040,6 +1143,55 @@ export function ScheduleCellItem({
         <Cell className="bg-slate-50 text-slate-400">-</Cell>
         <CheckCell checked={!!block.printing_completed} onToggle={() => onToggleProgress?.("printing_completed", !block.printing_completed)} />
       </div>
+    </div>
+  )
+}
+
+function OrderMoveCell({
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
+}: {
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onMoveUp?: () => void
+  onMoveDown?: () => void
+}) {
+  return (
+    <div className="flex items-center justify-center gap-0.5 border-r border-slate-300 px-0.5 py-0.5">
+      <button
+        type="button"
+        disabled={!canMoveUp}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation()
+          onMoveUp?.()
+        }}
+        className={`h-4 w-4 border text-[10px] leading-none ${
+          canMoveUp
+            ? "border-slate-400 bg-white hover:bg-slate-100"
+            : "border-slate-200 bg-slate-50 text-slate-300"
+        }`}
+      >
+        ↑
+      </button>
+      <button
+        type="button"
+        disabled={!canMoveDown}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation()
+          onMoveDown?.()
+        }}
+        className={`h-4 w-4 border text-[10px] leading-none ${
+          canMoveDown
+            ? "border-slate-400 bg-white hover:bg-slate-100"
+            : "border-slate-200 bg-slate-50 text-slate-300"
+        }`}
+      >
+        ↓
+      </button>
     </div>
   )
 }
