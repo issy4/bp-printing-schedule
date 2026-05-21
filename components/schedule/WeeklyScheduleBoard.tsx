@@ -739,37 +739,59 @@ export default function WeeklyScheduleBoard({
             <DialogTitle>案件詳細</DialogTitle>
           </DialogHeader>
 
-          {selectedBlock ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              <Info label="受注番号" value={selectedBlock.order_number} />
-              <Info label="品名" value={selectedBlock.product_name} />
-              <Info label="得意先" value={selectedBlock.customer_name} />
-              <Info label="部品" value={selectedBlock.part_name} />
-              <Info label="ユニット" value={selectedBlock.unit_name} />
-              <Info label="版型" value={selectedBlock.plate_size} />
-              <Info
-                label="色数"
-                value={`${selectedBlock.color_front ?? "-"}/${
-                  selectedBlock.color_back ?? "-"
-                }`}
-              />
-              <Info label="色指定・備考" value={selectedBlock.color_note} />
-              <Info
-                label="通紙"
-                value={selectedBlock.print_count?.toLocaleString("ja-JP")}
-              />
-              <Info label="特記" value={selectedBlock.block_note} />
-              <Info label="台数" value={String(selectedBlock.press_count)} />
-              <Info label="印刷機" value={selectedBlock.machine_name} />
-              <Info label="日付" value={selectedBlock.scheduled_date} />
-              <Info
-                label="順番"
-                value={selectedBlock.sequence_no ? String(selectedBlock.sequence_no) : null}
-              />
-              <Info label="状態" value={getStatusLabel(selectedBlock.block_status)} />
-              <Info label="元ファイル" value={selectedBlock.source_file_name} />
-            </div>
-          ) : null}
+{selectedBlock ? (
+  <>
+    <div className="grid gap-4 md:grid-cols-2">
+      <Info label="受注番号" value={selectedBlock.order_number} />
+      <Info label="品名" value={selectedBlock.product_name} />
+      <Info label="得意先" value={selectedBlock.customer_name} />
+      <Info label="部品" value={selectedBlock.part_name} />
+      <Info label="ユニット" value={selectedBlock.unit_name} />
+      <Info label="版型" value={selectedBlock.plate_size} />
+      <Info
+        label="色数"
+        value={`${selectedBlock.color_front ?? "-"}/${
+          selectedBlock.color_back ?? "-"
+        }`}
+      />
+      <Info label="色指定・備考" value={selectedBlock.color_note} />
+      <Info
+        label="通紙"
+        value={selectedBlock.print_count?.toLocaleString("ja-JP")}
+      />
+      <Info label="特記" value={selectedBlock.block_note} />
+      <Info label="台数" value={String(selectedBlock.press_count)} />
+      <Info label="印刷機" value={selectedBlock.machine_name} />
+      <Info label="日付" value={selectedBlock.scheduled_date} />
+      <Info
+        label="順番"
+        value={selectedBlock.sequence_no ? String(selectedBlock.sequence_no) : null}
+      />
+      <Info label="状態" value={getStatusLabel(selectedBlock.block_status)} />
+      <Info label="元ファイル" value={selectedBlock.source_file_name} />
+    </div>
+
+    <div className="mt-6 flex justify-end gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => setSelectedBlock(null)}
+      >
+        閉じる
+      </Button>
+
+      {selectedBlock.machine_id || selectedBlock.scheduled_date ? (
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={() => handleUnassignBlock(selectedBlock)}
+        >
+          未割当に戻す
+        </Button>
+      ) : null}
+    </div>
+  </>
+) : null}
         </DialogContent>
       </Dialog>
     </div>
