@@ -121,12 +121,15 @@ type WeeklyScheduleBoardProps = {
   initialBaseDate?: string
 }
 
-type ProgressField =
+type PrintItemProgressField =
   | "dtp_completed"
   | "paper_stacked"
   | "plate_completed"
   | "pp_processed"
-  | "printing_completed"
+
+type UnitProgressField = "printing_completed"
+
+type ProgressField = PrintItemProgressField | UnitProgressField
 
 const SCHEDULE_CELL_GRID =
   "grid-cols-[72px_240px_34px_34px_34px_34px_90px_58px_52px_90px_72px_90px_90px_34px]"
@@ -341,18 +344,20 @@ export default function WeeklyScheduleBoard({
 
     setData((current) => updateBlockInCalendarData(current, block, { [field]: checked }))
 
-    const res = await fetch(
-      `/api/schedule/print-item/${block.print_item_id}/progress`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          [field]: checked,
-        }),
+    const endpoint =
+      field === "printing_completed"
+        ? `/api/schedule/print-unit/${block.print_unit_id}/progress`
+        : `/api/schedule/print-item/${block.print_item_id}/progress`
+
+    const res = await fetch(endpoint, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
       },
-    )
+      body: JSON.stringify({
+        [field]: checked,
+      }),
+    })
 
     if (!res.ok) {
       setData(previousData)
@@ -482,7 +487,7 @@ export default function WeeklyScheduleBoard({
                 <button
                   key={item.block_id}
                   type="button"
-                  className={`w-full p-0 text-left hover:bg-slate-50 ${selectedUnassignedBlock?.block_id === item.block_id ? "bg-blue-50 ring-2 ring-blue-400" : ""}`}
+                  className={`w-full p-0 text-left hover:bg-slate-50 ${selectedUnassignedBlock?.block_id === item.block_id ? "bg-blue-50 ring-2 ring-blue-400" : ""}`
                   onClick={() => setSelectedUnassignedBlock(item)}
                 >
                   <div className="border-b border-slate-400 bg-white text-[12px] leading-tight">
