@@ -1,101 +1,134 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  console.log("PATCH API HIT")
+type Params = {
+  params: Promise<{
+    id: string
+  }>
+}
+
+type ScheduleBlockStatus =
+  | "unassigned"
+  | "tentative"
+  | "assigned"
+  | "confirmed"
+  | "completed"
+
+function normalizeStatus(body: Record<string, unknown>): ScheduleBlockStatus | undefined {
+  if (typeof body.status === "string") {
+    return body.status as ScheduleBlockStatus
+  }
+
+  const hasMachine = body.machine_id !== undefined && body.machine_id !== null && body.machine_id !== ""
+  const hasDate =
+    body.scheduled_date !== undefined &&
+    body.scheduled_date !== null &&
+    body.scheduled_date !== ""
+
+  if (hasMachine || hasDate) {
+    return "assigned"
+  }
+
+  return undefined
+}
+
+export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params
-
     const body = await request.json()
-
     const supabase = await createClient()
 
-    const updateData: Record<string, any> = {}
+    const updateData: Record<string, unknown> = {}
 
-    // 印刷機
-    if (body.machine_id !== undefined) {
-      updateData.machine_id = body.machine_id
+    if ("machine_id" in body) {
+      updateData.machine_id = body.machine_id || null
     }
 
-    // 日付
-    if (body.scheduled_date !== undefined) {
-      updateData.scheduled_date = body.scheduled_date
+    if ("scheduled_date" in body) {
+      updateData.scheduled_date = body.scheduled_date || null
     }
 
-    // 日勤 / 夜勤
-    if (body.shift_category !== undefined) {
-      updateData.shift_category = body.shift_category
+    if ("shift_category" in body) {
+      updateData.shift_category = body.shift_category || null
     }
 
-    // 表示順
-    if (body.sequence_no !== undefined) {
-      updateData.sequence_no = body.sequence_no
+    if ("sequence_no" in body) {
+      updateData.sequence_no =
+        body.sequence_no === null || body.sequence_no === ""
+          ? null
+          : Number(body.sequence_no)
     }
 
-    // チェック項目
-    if (body.dtp_completed !== undefined) {
-      updateData.dtp_completed = body.dtp_completed
+    if ("planned_print_count" in body) {
+      updateData.planned_print_count =
+        body.planned_print_count === null || body.planned_print_count === ""
+          ? null
+          : Number(body.planned_print_count)
     }
 
-    if (body.paper_stacked !== undefined) {
-      updateData.paper_stacked = body.paper_stacked
+    if ("note" in body) {
+      updateData.note = body.note ?? null
     }
 
-    if (body.plate_completed !== undefined) {
-      updateData.plate_completed = body.plate_completed
-    }
+    const nextStatus = normalizeStatus(body)
 
-    if (body.pp_processed !== undefined) {
-      updateData.pp_processed = body.pp_processed
-    }
-
-    if (body.printing_completed !== undefined) {
-      updateData.printing_completed = body.printing_completed
-    }
-
-    // 特記
-    if (body.note !== undefined) {
-      updateData.note = body.note
-    }
-
-    // 作業時間
-    if (body.work_time !== undefined) {
-      updateData.work_time = body.work_time
+    if (nextStatus) {
+      updateData.status = nextStatus
     }
 
     updateData.updated_at = new Date().toISOString()
 
-    const { data, error } = await supabase
+    const { data: updatedBlock, error: blockError } = await supabase
       .from("schedule_blocks")
       .update(updateData)
       .eq("id", id)
-      .select()
+      .select("id, print_unit_id, machine_id, scheduled_date, shift_category, status")
       .single()
 
-    if (error) {
+    if (blockError) {
       return NextResponse.json(
         {
           success: false,
-          error: error.message,
+          error: blockError.message,
         },
-        { status: 500 }
+        { status: 500 },
       )
+    }
+
+    if (updatedBlock?.print_unit_id && nextStatus) {
+      const { error: unitError } = await supabase
+        .from("print_units")
+        .update({
+          status: nextStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", updatedBlock.print_unit_id)
+
+      if (unitError) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: unitError.message,
+          },
+          { status: 500 },
+        )
+      }
     }
 
     return NextResponse.json({
       success: true,
-      data,
+      data: updatedBlock,
     })
-  } catch (e: any) {
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "schedule_blocks の更新に失敗しました"
+
     return NextResponse.json(
       {
         success: false,
-        error: e.message,
+        error: message,
       },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }
