@@ -487,7 +487,7 @@ export default function WeeklyScheduleBoard({
                 <button
                   key={item.block_id}
                   type="button"
-                  className={`w-full p-0 text-left hover:bg-slate-50 ${selectedUnassignedBlock?.block_id === item.block_id ? "bg-blue-50 ring-2 ring-blue-400" : ""}`
+                  className={`w-full p-0 text-left hover:bg-slate-50 ${selectedUnassignedBlock?.block_id === item.block_id ? "bg-blue-50 ring-2 ring-blue-400" : ""}`}
                   onClick={() => setSelectedUnassignedBlock(item)}
                 >
                   <div className="border-b border-slate-400 bg-white text-[12px] leading-tight">
