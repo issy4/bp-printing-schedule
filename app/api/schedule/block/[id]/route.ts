@@ -5,6 +5,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  console.log("PATCH API HIT")
   try {
     const { id } = await params
 
