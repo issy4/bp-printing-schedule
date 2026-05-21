@@ -400,6 +400,32 @@ export default function WeeklyScheduleBoard({
     }
   }
 
+  async function handleUnassignBlock(block: ScheduleBlockRow) {
+  if (!confirm("この案件を未割当に戻しますか？")) return
+
+  const res = await fetch(`/api/schedule/block/${block.block_id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      machine_id: null,
+      scheduled_date: null,
+      shift_category: null,
+      sequence_no: null,
+      status: "unassigned",
+    }),
+  })
+
+  if (!res.ok) {
+    alert("未割当への戻し処理に失敗しました。")
+    return
+  }
+
+  setSelectedBlock(null)
+  await loadData(baseDate)
+}
+
   async function handleAssignBlockToCell({
     block,
     machineId,
