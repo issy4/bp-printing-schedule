@@ -480,12 +480,21 @@ export default function WeeklyScheduleBoard({
     if (!block) return
 
     const previousData = data
+    
+    const sequenceNo = getNextSequenceNo(
+  data,
+  machineId,
+  shiftCategory,
+  date,
+  block.block_id,
+)
 
     setData((current) =>
       moveBlockInCalendarData(current, block, {
         machineId,
         date,
         shiftCategory,
+        sequenceNo,
       }),
     )
     setSelectedUnassignedBlock(null)
@@ -495,6 +504,7 @@ export default function WeeklyScheduleBoard({
       machineId,
       date,
       shiftCategory,
+      sequenceNo,
     })
 
     if (!ok) {
@@ -870,6 +880,23 @@ function updateBlockInCalendarData(
   )
 
   return { ...current, cells: nextCells, unassignedBlocks: nextUnassignedBlocks }
+}
+
+function getNextSequenceNo(
+  current: WeeklyCalendarData,
+  machineId: string,
+  shiftCategory: "day" | "night",
+  date: string,
+  movingBlockId?: string,
+) {
+  const key = makeCellKey(machineId, shiftCategory, date)
+  const blocks = current.cells[key]?.blocks ?? []
+
+  const maxSeq = blocks
+    .filter((b) => b.block_id !== movingBlockId)
+    .reduce((max, b) => Math.max(max, b.sequence_no ?? 0), 0)
+
+  return maxSeq + 1
 }
 
 function moveBlockInCalendarData(
