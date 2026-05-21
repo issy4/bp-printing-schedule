@@ -84,13 +84,12 @@ export async function POST(request: NextRequest) {
       const { error: detailError } = await supabase
         .from("print_item_details")
         .insert({
-  print_item_id: printItem.id,
-  dtp_completed: false,
-  paper_stacked: false,
-  plate_completed: false,
-  pp_processed: false,
-  printing_completed: false,
-})
+          print_item_id: printItem.id,
+          dtp_completed: false,
+          paper_stacked: false,
+          plate_completed: false,
+          pp_processed: false,
+        })
 
       if (detailError) {
         return NextResponse.json(
