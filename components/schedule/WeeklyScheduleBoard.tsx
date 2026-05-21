@@ -420,11 +420,13 @@ export default function WeeklyScheduleBoard({
     machineId,
     date,
     shiftCategory,
+    sequenceNo,
   }: {
     block: ScheduleBlockRow
     machineId: string | null
     date: string | null
     shiftCategory: "day" | "night" | null
+    sequenceNo?: number | null
   }) {
     const isUnassign = !machineId || !date || !shiftCategory
 
@@ -444,6 +446,7 @@ export default function WeeklyScheduleBoard({
               machine_id: machineId,
               scheduled_date: date,
               shift_category: shiftCategory,
+              sequence_no: sequenceNo ?? null,
               status: "assigned",
             },
       ),
@@ -480,14 +483,6 @@ export default function WeeklyScheduleBoard({
     if (!block) return
 
     const previousData = data
-    
-    const sequenceNo = getNextSequenceNo(
-  data,
-  machineId,
-  shiftCategory,
-  date,
-  block.block_id,
-)
 
     setData((current) =>
       moveBlockInCalendarData(current, block, {
@@ -498,6 +493,8 @@ export default function WeeklyScheduleBoard({
       }),
     )
     setSelectedUnassignedBlock(null)
+
+    const sequenceNo = getNextSequenceNo(data, machineId, shiftCategory, date, block.block_id)
 
     const ok = await updateBlockAssignment({
       block,
@@ -531,11 +528,20 @@ export default function WeeklyScheduleBoard({
     const previousData = data
 
     if (dropData.type === "schedule-cell") {
+      const sequenceNo = getNextSequenceNo(
+        data,
+        dropData.machineId,
+        dropData.shiftCategory,
+        dropData.date,
+        dragData.block.block_id,
+      )
+
       setData((current) =>
         moveBlockInCalendarData(current, dragData.block, {
           machineId: dropData.machineId,
           date: dropData.date,
           shiftCategory: dropData.shiftCategory,
+          sequenceNo,
         }),
       )
       setSelectedUnassignedBlock(null)
@@ -545,6 +551,7 @@ export default function WeeklyScheduleBoard({
         machineId: dropData.machineId,
         date: dropData.date,
         shiftCategory: dropData.shiftCategory,
+        sequenceNo,
       })
 
       if (!ok) {
@@ -906,6 +913,7 @@ function moveBlockInCalendarData(
     machineId: string | null
     date: string | null
     shiftCategory: "day" | "night" | null
+    sequenceNo?: number | null
   },
 ): WeeklyCalendarData {
   const isUnassign = !target.machineId || !target.date || !target.shiftCategory
@@ -917,6 +925,7 @@ function moveBlockInCalendarData(
     shift_category: target.shiftCategory,
     block_status: isUnassign ? "unassigned" : "assigned",
     unit_status: isUnassign ? "unassigned" : "assigned",
+    sequence_no: isUnassign ? null : target.sequenceNo ?? block.sequence_no,
     machine_name: isUnassign ? null : block.machine_name,
     shift_label: target.shiftCategory === "day" ? "日勤" : target.shiftCategory === "night" ? "夜勤" : "",
     shift_sort_order: target.shiftCategory === "day" ? 1 : target.shiftCategory === "night" ? 2 : 99,
@@ -947,9 +956,16 @@ function moveBlockInCalendarData(
       }
     }
 
+    const sortedBlocks = [...nextCells[key].blocks, movedBlock].sort((a, b) => {
+      const seqA = a.sequence_no ?? 9999
+      const seqB = b.sequence_no ?? 9999
+      if (seqA !== seqB) return seqA - seqB
+      return a.unit_name.localeCompare(b.unit_name, "ja")
+    })
+
     nextCells[key] = {
       ...nextCells[key],
-      blocks: [...nextCells[key].blocks, movedBlock],
+      blocks: sortedBlocks,
     }
   }
 
