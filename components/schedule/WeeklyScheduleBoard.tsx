@@ -336,34 +336,44 @@ export default function WeeklyScheduleBoard({
   }
 
   async function handleToggleProgress(
-    block: ScheduleBlockRow,
-    field: ProgressField,
-    checked: boolean,
-  ) {
-    const previousData = data
+  block: ScheduleBlockRow,
+  field: ProgressField,
+  checked: boolean,
+) {
+  const previousData = data
 
-    setData((current) => updateBlockInCalendarData(current, block, { [field]: checked }))
+  const isUnitProgress = field === "printing_completed"
 
-    const endpoint =
-      field === "printing_completed"
-        ? `/api/schedule/print-unit/${block.print_unit_id}/progress`
-        : `/api/schedule/print-item/${block.print_item_id}/progress`
-
-    const res = await fetch(endpoint, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
+  setData((current) =>
+    updateBlockInCalendarData(
+      current,
+      block,
+      { [field]: checked },
+      {
+        scope: isUnitProgress ? "block" : "print_item",
       },
-      body: JSON.stringify({
-        [field]: checked,
-      }),
-    })
+    ),
+  )
 
-    if (!res.ok) {
-      setData(previousData)
-      alert("進捗の保存に失敗しました。")
-    }
+  const endpoint = isUnitProgress
+    ? `/api/schedule/print-unit/${block.print_unit_id}/progress`
+    : `/api/schedule/print-item/${block.print_item_id}/progress`
+
+  const res = await fetch(endpoint, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      [field]: checked,
+    }),
+  })
+
+  if (!res.ok) {
+    setData(previousData)
+    alert("進捗の保存に失敗しました。")
   }
+}
 
   async function handleSaveNote(block: ScheduleBlockRow, note: string) {
     const previousData = data
@@ -744,14 +754,27 @@ function updateBlockInCalendarData(
   current: WeeklyCalendarData,
   target: ScheduleBlockRow,
   patch: Partial<ScheduleBlockRow>,
+  options?: {
+    scope?: "block" | "print_item"
+  },
 ): WeeklyCalendarData {
+  const scope = options?.scope ?? "block"
+
+  const isTarget = (b: ScheduleBlockRow) => {
+    if (scope === "print_item") {
+      return b.print_item_id === target.print_item_id
+    }
+
+    return b.block_id === target.block_id
+  }
+
   const nextCells: Record<string, WeeklyCalendarCell> = {}
 
   for (const key of Object.keys(current.cells)) {
     nextCells[key] = {
       ...current.cells[key],
       blocks: current.cells[key].blocks.map((b) =>
-        b.block_id === target.block_id || b.print_item_id === target.print_item_id
+        isTarget(b)
           ? {
               ...b,
               ...patch,
@@ -762,7 +785,7 @@ function updateBlockInCalendarData(
   }
 
   const nextUnassignedBlocks = current.unassignedBlocks.map((b) =>
-    b.block_id === target.block_id || b.print_item_id === target.print_item_id
+    isTarget(b)
       ? {
           ...b,
           ...patch,
