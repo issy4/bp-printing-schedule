@@ -820,14 +820,14 @@ export default function WeeklyScheduleBoard({
               <thead className="bg-white">
                 <tr>
                   <th
-                    className={`sticky left-0 top-0 z-[60] h-16 ${MACHINE_COLUMN_WIDTH} border border-r-2 border-slate-300 border-r-slate-500 bg-[#f7f7f7] px-3 py-3 text-left text-sm font-bold whitespace-nowrap shadow-[6px_0_10px_rgba(15,23,42,0.16)]`}
+                    className={`sticky left-0 top-0 z-[70] h-16 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-[#f7f7f7] px-3 py-3 text-left text-sm font-bold whitespace-nowrap shadow-[inset_-2px_0_0_#64748b,inset_0_-2px_0_#94a3b8,6px_0_10px_rgba(15,23,42,0.16)]`}
                   >
                     印刷機
                   </th>
                   {data.weekDays.map((day) => (
                     <th
                       key={day.date}
-                      className={`sticky top-0 z-40 h-16 min-w-[1150px] border border-slate-300 px-2 py-3 text-center text-sm font-bold ${
+                      className={`sticky top-0 z-40 h-16 min-w-[1150px] border border-slate-300 px-2 py-3 text-center text-sm font-bold shadow-[inset_0_-2px_0_#94a3b8,inset_-1px_0_0_#cbd5e1] ${
                         day.date === today ? "bg-sky-50" : "bg-[#f7f7f7]"
                       }`}
                     >
@@ -844,7 +844,7 @@ export default function WeeklyScheduleBoard({
                 {machineRows.map((row) => (
                   <tr key={`${row.machine_id}-${row.shift_category}`}>
                     <td
-                      className={`sticky left-0 z-30 ${MACHINE_COLUMN_WIDTH} border border-r-2 border-slate-300 border-r-slate-500 bg-white px-2 py-2 align-top font-bold whitespace-nowrap shadow-[6px_0_8px_rgba(15,23,42,0.10)]`}
+                      className={`sticky left-0 z-30 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-white px-2 py-2 align-top font-bold whitespace-nowrap shadow-[inset_-2px_0_0_#64748b,inset_0_-1px_0_#cbd5e1,6px_0_8px_rgba(15,23,42,0.10)]`}
                     >
                       <div className="leading-tight">{row.machine_name}</div>
                       <div className="mt-1 text-[10px] text-muted-foreground">{row.shift_label}</div>
