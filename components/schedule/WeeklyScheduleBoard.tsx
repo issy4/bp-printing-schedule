@@ -805,7 +805,7 @@ export default function WeeklyScheduleBoard({
             onScroll={() => syncScroll("top")}
             className="h-4 overflow-x-auto overflow-y-hidden border-b bg-slate-50"
           >
-            <div className="h-1 min-w-[8200px]" />
+            <div className="h-1" style={{ width: tableScrollWidth }} />
           </div>
 
           <div
@@ -813,19 +813,19 @@ export default function WeeklyScheduleBoard({
             onScroll={() => syncScroll("body")}
             className="flex-1 overflow-auto"
           >
-            <table className="min-w-[8200px] border-collapse text-[11px]">
-              <thead className="sticky top-0 z-40 bg-white shadow-sm">
+            <table className="min-w-[8200px] border-separate border-spacing-0 text-[11px]">
+              <thead className="sticky top-0 z-20 bg-white">
                 <tr>
-                  <th className="sticky left-0 top-0 z-50 border border-slate-300 bg-[#f7f7f7] px-1 py-1 text-left font-bold whitespace-nowrap shadow-[4px_0_6px_rgba(0,0,0,0.08)]">
+                  <th className="sticky left-0 top-0 z-50 h-12 min-w-[76px] border border-r-2 border-slate-300 border-r-slate-500 bg-[#f7f7f7] px-2 py-2 text-left text-sm font-bold whitespace-nowrap shadow-[6px_0_8px_rgba(15,23,42,0.14)]">
   印刷機
 </th>
                   {data.weekDays.map((day) => (
                     <th
-  key={day.date}
-  className={`sticky top-0 z-40 border border-slate-300 px-1 py-1 text-center font-bold min-w-[1150px] ${
-    day.date === today ? "bg-sky-50" : "bg-[#f7f7f7]"
-  }`}
->
+                      key={day.date}
+                      className={`border border-slate-300 px-1 py-1 text-center font-bold min-w-[1150px] ${
+                        day.date === today ? "bg-sky-50" : "bg-[#f7f7f7]"
+                      }`}
+                    >
                       <div>{day.label}({day.weekday})</div>
                     </th>
                   ))}
