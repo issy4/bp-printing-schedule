@@ -814,18 +814,18 @@ export default function WeeklyScheduleBoard({
             className="flex-1 overflow-auto"
           >
             <table className="min-w-[8200px] border-collapse text-[11px]">
-              <thead className="sticky top-0 z-20 bg-white">
+              <thead className="sticky top-0 z-40 bg-white shadow-sm">
                 <tr>
-                  <th className="sticky left-0 z-30 border border-slate-300 bg-[#f7f7f7] px-1 py-1 text-left font-bold whitespace-nowrap">
-                    印刷機
-                  </th>
+                  <th className="sticky left-0 top-0 z-50 border border-slate-300 bg-[#f7f7f7] px-1 py-1 text-left font-bold whitespace-nowrap shadow-[4px_0_6px_rgba(0,0,0,0.08)]">
+  印刷機
+</th>
                   {data.weekDays.map((day) => (
                     <th
-                      key={day.date}
-                      className={`border border-slate-300 px-1 py-1 text-center font-bold min-w-[1150px] ${
-                        day.date === today ? "bg-sky-50" : "bg-[#f7f7f7]"
-                      }`}
-                    >
+  key={day.date}
+  className={`sticky top-0 z-40 border border-slate-300 px-1 py-1 text-center font-bold min-w-[1150px] ${
+    day.date === today ? "bg-sky-50" : "bg-[#f7f7f7]"
+  }`}
+>
                       <div>{day.label}({day.weekday})</div>
                     </th>
                   ))}
