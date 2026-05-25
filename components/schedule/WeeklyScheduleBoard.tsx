@@ -831,7 +831,7 @@ export default function WeeklyScheduleBoard({
             <table className="min-w-[8200px] border-collapse text-[11px]">
               <thead className="sticky top-0 z-20 bg-white">
                 <tr>
-                -[#f7f7f7] px-1 py-1 text-left font-bold whitespace-nowrap">
+                  <th className="border border-slate-300 bg-[#f7f7f7] px-1 py-1 text-left font-bold whitespace-nowrap">
                     印刷機
                   </th>
                   {data.weekDays.map((day) => (
