@@ -164,6 +164,9 @@ type UnassignedDropData = {
 const SCHEDULE_CELL_GRID =
   "grid-cols-[44px_72px_240px_34px_34px_34px_34px_90px_58px_52px_90px_72px_90px_90px_34px]"
 
+const SCHEDULE_TABLE_MIN_WIDTH = "min-w-[8200px]"
+const MACHINE_COLUMN_WIDTH = "min-w-[104px]"
+
 function formatDateJP(dateStr: string) {
   const d = new Date(dateStr)
   return `${d.getMonth() + 1}/${d.getDate()}`
@@ -695,7 +698,7 @@ export default function WeeklyScheduleBoard({
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="grid h-full min-h-[760px] grid-cols-[420px_1fr] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
+      <div className="grid h-[calc(100vh-120px)] min-h-[760px] grid-cols-[420px_1fr] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
         <DroppableUnassignedArea active={!!draggingBlock && !!draggingBlock.machine_id}>
           <aside className="flex h-full flex-col border-r bg-white">
             <div className="border-b p-4">
@@ -803,30 +806,35 @@ export default function WeeklyScheduleBoard({
           <div
             ref={topScrollRef}
             onScroll={() => syncScroll("top")}
-            className="h-4 overflow-x-auto overflow-y-hidden border-b bg-slate-50"
+            className="h-5 overflow-x-auto overflow-y-hidden border-b bg-slate-50"
           >
-            <div className="h-1 min-w-[8200px]" />
+            <div className={`h-1 ${SCHEDULE_TABLE_MIN_WIDTH}`} />
           </div>
 
           <div
             ref={bodyScrollRef}
             onScroll={() => syncScroll("body")}
-            className="flex-1 overflow-auto"
+            className="relative flex-1 overflow-auto bg-white"
           >
-            <table className="min-w-[8200px] border-separate border-spacing-0 text-[11px]">
-              <thead className="sticky top-0 z-20 bg-white">
+            <table className={`${SCHEDULE_TABLE_MIN_WIDTH} border-separate border-spacing-0 text-[11px]`}>
+              <thead className="bg-white">
                 <tr>
-                  <th className="sticky left-0 top-0 z-50 h-12 min-w-[76px] border border-r-2 border-slate-300 border-r-slate-500 bg-[#f7f7f7] px-2 py-2 text-left text-sm font-bold whitespace-nowrap shadow-[6px_0_8px_rgba(15,23,42,0.14)]">
-  印刷機
-</th>
+                  <th
+                    className={`sticky left-0 top-0 z-[60] h-16 ${MACHINE_COLUMN_WIDTH} border border-r-2 border-slate-300 border-r-slate-500 bg-[#f7f7f7] px-3 py-3 text-left text-sm font-bold whitespace-nowrap shadow-[6px_0_10px_rgba(15,23,42,0.16)]`}
+                  >
+                    印刷機
+                  </th>
                   {data.weekDays.map((day) => (
                     <th
                       key={day.date}
-                      className={`border border-slate-300 px-1 py-1 text-center font-bold min-w-[1150px] ${
+                      className={`sticky top-0 z-40 h-16 min-w-[1150px] border border-slate-300 px-2 py-3 text-center text-sm font-bold ${
                         day.date === today ? "bg-sky-50" : "bg-[#f7f7f7]"
                       }`}
                     >
-                      <div>{day.label}({day.weekday})</div>
+                      <div className="leading-tight">
+                        <div>{day.label}</div>
+                        <div className="mt-1 text-xs text-slate-500">{day.weekday}</div>
+                      </div>
                     </th>
                   ))}
                 </tr>
@@ -835,9 +843,11 @@ export default function WeeklyScheduleBoard({
               <tbody>
                 {machineRows.map((row) => (
                   <tr key={`${row.machine_id}-${row.shift_category}`}>
-                    <td className="sticky left-0 z-10 border border-slate-300 bg-white px-1 py-1 align-top font-bold whitespace-nowrap">
-                      <div>{row.machine_name}</div>
-                      <div className="text-[10px] text-muted-foreground">{row.shift_label}</div>
+                    <td
+                      className={`sticky left-0 z-30 ${MACHINE_COLUMN_WIDTH} border border-r-2 border-slate-300 border-r-slate-500 bg-white px-2 py-2 align-top font-bold whitespace-nowrap shadow-[6px_0_8px_rgba(15,23,42,0.10)]`}
+                    >
+                      <div className="leading-tight">{row.machine_name}</div>
+                      <div className="mt-1 text-[10px] text-muted-foreground">{row.shift_label}</div>
                     </td>
 
                     {data.weekDays.map((day) => {
@@ -1306,7 +1316,7 @@ function DroppableScheduleCell({
     <div
       ref={setNodeRef}
       onClick={onClick}
-      className={`min-h-[92px] bg-white ${active ? "cursor-copy hover:bg-blue-50" : ""} ${
+      className={`min-h-[104px] bg-white ${active ? "cursor-copy hover:bg-blue-50" : ""} ${
         isOver ? "bg-blue-100 ring-2 ring-blue-400" : ""
       }`}
     >
