@@ -336,7 +336,7 @@ export default function WeeklyScheduleBoard({
     if (table) observer.observe(table)
 
     return () => observer.disconnect()
-  }, [data.weekDays.length, machineRows.length])
+  }, [data.weekDays.length, data.machineRows.length])
 
   const weekRangeLabel = React.useMemo(() => {
     const days = data.weekDays
