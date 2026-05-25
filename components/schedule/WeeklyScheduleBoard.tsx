@@ -291,6 +291,7 @@ export default function WeeklyScheduleBoard({
   const topScrollRef = React.useRef<HTMLDivElement | null>(null)
   const bodyScrollRef = React.useRef<HTMLDivElement | null>(null)
   const isSyncingScroll = React.useRef(false)
+  const [tableScrollWidth, setTableScrollWidth] = React.useState(8200)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -316,11 +317,26 @@ export default function WeeklyScheduleBoard({
     [baseDate],
   )
 
+  
+
   React.useEffect(() => {
-    if (!initialData) {
-      void loadData(baseDate)
+    const body = bodyScrollRef.current
+    if (!body) return
+
+    const updateWidth = () => {
+      setTableScrollWidth(body.scrollWidth)
     }
-  }, [initialData, baseDate, loadData])
+
+    updateWidth()
+
+    const observer = new ResizeObserver(updateWidth)
+    observer.observe(body)
+
+    const table = body.querySelector("table")
+    if (table) observer.observe(table)
+
+    return () => observer.disconnect()
+  }, [data.weekDays.length, machineRows.length])
 
   const weekRangeLabel = React.useMemo(() => {
     const days = data.weekDays
@@ -805,18 +821,17 @@ export default function WeeklyScheduleBoard({
             onScroll={() => syncScroll("top")}
             className="h-4 overflow-x-auto overflow-y-hidden border-b bg-slate-50"
           >
-            <div className="h-1 min-w-[8200px]" />
+            <div className="h-1" style={{ width: tableScrollWidth }} />
           </div>
 
           <div
-            ref={bodyScrollRef}
-            onScroll={() => syncScroll("body")}
+            ref={bodyScrollRefll("body")}
             className="flex-1 overflow-auto"
           >
             <table className="min-w-[8200px] border-collapse text-[11px]">
               <thead className="sticky top-0 z-20 bg-white">
                 <tr>
-                  <th className="sticky left-0 z-30 border border-slate-300 bg-[#f7f7f7] px-1 py-1 text-left font-bold whitespace-nowrap">
+                -[#f7f7f7] px-1 py-1 text-left font-bold whitespace-nowrap">
                     印刷機
                   </th>
                   {data.weekDays.map((day) => (
