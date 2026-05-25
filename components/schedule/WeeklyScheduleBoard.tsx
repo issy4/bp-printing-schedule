@@ -805,7 +805,7 @@ export default function WeeklyScheduleBoard({
             onScroll={() => syncScroll("top")}
             className="h-4 overflow-x-auto overflow-y-hidden border-b bg-slate-50"
           >
-            <div className="h-1" style={{ width: tableScrollWidth }} />
+            <div className="h-1 min-w-[8200px]" />
           </div>
 
           <div
