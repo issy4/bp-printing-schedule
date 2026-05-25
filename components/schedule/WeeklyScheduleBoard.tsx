@@ -166,6 +166,7 @@ const SCHEDULE_CELL_GRID =
 
 const SCHEDULE_TABLE_MIN_WIDTH = "min-w-[8200px]"
 const MACHINE_COLUMN_WIDTH = "min-w-[104px]"
+const DAY_COLUMN_WIDTH_PX = 1150
 
 function formatDateJP(dateStr: string) {
   const d = new Date(dateStr)
@@ -294,6 +295,7 @@ export default function WeeklyScheduleBoard({
   const topScrollRef = React.useRef<HTMLDivElement | null>(null)
   const bodyScrollRef = React.useRef<HTMLDivElement | null>(null)
   const isSyncingScroll = React.useRef(false)
+  const lastAutoScrolledWeekKey = React.useRef<string | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -361,6 +363,29 @@ export default function WeeklyScheduleBoard({
   }, [data.machineRows, machineFilter])
 
   const today = formatYmd(new Date())
+
+  React.useEffect(() => {
+    const todayIndex = data.weekDays.findIndex((day) => day.date === today)
+    const weekKey = data.weekDays.map((day) => day.date).join("|")
+
+    if (todayIndex < 0 || !weekKey || lastAutoScrolledWeekKey.current === weekKey) {
+      return
+    }
+
+    lastAutoScrolledWeekKey.current = weekKey
+
+    requestAnimationFrame(() => {
+      const scrollLeft = todayIndex * DAY_COLUMN_WIDTH_PX
+
+      if (topScrollRef.current) {
+        topScrollRef.current.scrollLeft = scrollLeft
+      }
+
+      if (bodyScrollRef.current) {
+        bodyScrollRef.current.scrollLeft = scrollLeft
+      }
+    })
+  }, [data.weekDays, today])
 
   const goWeek = (direction: -1 | 1) => {
     const base = new Date(baseDate)
@@ -820,14 +845,14 @@ export default function WeeklyScheduleBoard({
               <thead className="bg-white">
                 <tr>
                   <th
-                    className={`sticky left-0 top-0 z-[70] h-16 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-[#f7f7f7] px-3 py-3 text-left text-sm font-bold whitespace-nowrap shadow-[inset_-2px_0_0_#64748b,inset_0_-2px_0_#94a3b8,6px_0_10px_rgba(15,23,42,0.16)]`}
+                    className={`sticky left-0 top-0 z-[70] h-16 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-[#f7f7f7] px-3 py-3 text-left text-sm font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.10)]`}
                   >
                     印刷機
                   </th>
                   {data.weekDays.map((day) => (
                     <th
                       key={day.date}
-                      className={`sticky top-0 z-40 h-16 min-w-[1150px] border border-slate-300 px-2 py-3 text-center text-sm font-bold shadow-[inset_0_-2px_0_#94a3b8,inset_-1px_0_0_#cbd5e1] ${
+                      className={`sticky top-0 z-40 h-16 min-w-[1150px] border border-slate-300 px-2 py-3 text-center text-sm font-bold shadow-[inset_0_-1px_0_#cbd5e1,inset_-1px_0_0_#cbd5e1] ${
                         day.date === today ? "bg-sky-50" : "bg-[#f7f7f7]"
                       }`}
                     >
@@ -844,7 +869,7 @@ export default function WeeklyScheduleBoard({
                 {machineRows.map((row) => (
                   <tr key={`${row.machine_id}-${row.shift_category}`}>
                     <td
-                      className={`sticky left-0 z-30 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-white px-2 py-2 align-top font-bold whitespace-nowrap shadow-[inset_-2px_0_0_#64748b,inset_0_-1px_0_#cbd5e1,6px_0_8px_rgba(15,23,42,0.10)]`}
+                      className={`sticky left-0 z-30 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-white px-2 py-2 align-top font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.08)]`}
                     >
                       <div className="leading-tight">{row.machine_name}</div>
                       <div className="mt-1 text-[10px] text-muted-foreground">{row.shift_label}</div>
