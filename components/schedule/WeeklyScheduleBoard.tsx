@@ -288,6 +288,10 @@ export default function WeeklyScheduleBoard({
     React.useState<ScheduleBlockRow | null>(null)
   const [draggingBlock, setDraggingBlock] = React.useState<ScheduleBlockRow | null>(null)
 
+  const topScrollRef = React.useRef<HTMLDivElement | null>(null)
+  const bodyScrollRef = React.useRef<HTMLDivElement | null>(null)
+  const isSyncingScroll = React.useRef(false)
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -367,6 +371,26 @@ export default function WeeklyScheduleBoard({
     const next = formatYmd(new Date())
     setBaseDate(next)
     void loadData(next)
+  }
+
+  function syncScroll(source: "top" | "body") {
+    if (isSyncingScroll.current) return
+
+    const top = topScrollRef.current
+    const body = bodyScrollRef.current
+    if (!top || !body) return
+
+    isSyncingScroll.current = true
+
+    if (source === "top") {
+      body.scrollLeft = top.scrollLeft
+    } else {
+      top.scrollLeft = body.scrollLeft
+    }
+
+    requestAnimationFrame(() => {
+      isSyncingScroll.current = false
+    })
   }
 
   async function handleToggleProgress(
@@ -776,7 +800,19 @@ export default function WeeklyScheduleBoard({
 
           {error ? <div className="p-4 text-sm text-red-600">{error}</div> : null}
 
-          <div className="flex-1 overflow-auto">
+          <div
+            ref={topScrollRef}
+            onScroll={() => syncScroll("top")}
+            className="h-4 overflow-x-auto overflow-y-hidden border-b bg-slate-50"
+          >
+            <div className="h-1 min-w-[1800px]" />
+          </div>
+
+          <div
+            ref={bodyScrollRef}
+            onScroll={() => syncScroll("body")}
+            className="flex-1 overflow-auto"
+          >
             <table className="min-w-[1800px] border-collapse text-[11px]">
               <thead className="sticky top-0 z-20 bg-white">
                 <tr>
