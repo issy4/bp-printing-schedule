@@ -1037,19 +1037,16 @@ export default function WeeklyScheduleBoard({
 
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   <Info label="得意先" value={selectedBlock.customer_name} />
-                  <Info label="部品" value={selectedBlock.part_name} />
-                  <Info label="ユニット" value={selectedBlock.unit_name} />
+                  <Info label="印刷単位" value={formatPrintUnitSummary(selectedBlock)} />
                   <Info label="版型" value={selectedBlock.plate_size} />
                   <Info label="色数" value={`${selectedBlock.color_front ?? "-"}/${selectedBlock.color_back ?? "-"}`} />
                   <Info label="色指定・備考" value={selectedBlock.color_note} />
                   <Info label="通紙" value={selectedBlock.print_count?.toLocaleString("ja-JP")} />
                   <Info label="特記" value={selectedBlock.block_note} />
-                  <Info label="台数" value={String(selectedBlock.press_count)} />
                   <Info label="印刷機" value={selectedBlock.machine_name} />
                   <Info label="日付" value={selectedBlock.scheduled_date} />
                   <Info label="順番" value={selectedBlock.sequence_no ? String(selectedBlock.sequence_no) : null} />
                   <Info label="状態" value={getStatusLabel(selectedBlock.block_status)} />
-                  <Info label="元ファイル" value={selectedBlock.source_file_name} />
                 </div>
 
                 <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -1622,6 +1619,29 @@ function CheckCell({
       </button>
     </div>
   )
+}
+
+
+function formatPrintUnitSummary(block: ScheduleBlockRow) {
+  const partName = block.part_name?.trim() || null
+  const unitName = block.unit_name?.trim() || null
+  const pressCount = Number.isFinite(block.press_count) ? block.press_count : null
+
+  const unitNo = unitName?.match(/-(\d+)$/)?.[1] ?? null
+
+  if (partName && pressCount && unitNo) {
+    return `${partName}　${pressCount}台中 ${unitNo}台目`
+  }
+
+  if (unitName && partName && pressCount) {
+    return `${unitName}（${partName}／全${pressCount}台）`
+  }
+
+  if (unitName && partName) {
+    return `${unitName}（${partName}）`
+  }
+
+  return unitName || partName || null
 }
 
 function getSafeOrderNumber(block: ScheduleBlockRow) {
