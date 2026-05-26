@@ -929,14 +929,14 @@ export default function WeeklyScheduleBoard({
               <thead className="bg-white">
                 <tr>
                   <th
-                    className={`sticky left-0 top-0 z-[70] h-16 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-[#f7f7f7] px-3 py-3 text-left text-sm font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.10)]`}
+                    className={`sticky left-0 top-0 z-30 h-16 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-[#f7f7f7] px-3 py-3 text-left text-sm font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.10)]`}
                   >
                     印刷機
                   </th>
                   {data.weekDays.map((day) => (
                     <th
                       key={day.date}
-                      className={`sticky top-0 z-40 h-16 min-w-[1150px] border border-slate-300 px-2 py-3 text-center text-sm font-bold shadow-[inset_0_-1px_0_#cbd5e1,inset_-1px_0_0_#cbd5e1] ${
+                      className={`sticky top-0 z-20 h-16 min-w-[1150px] border border-slate-300 px-2 py-3 text-center text-sm font-bold shadow-[inset_0_-1px_0_#cbd5e1,inset_-1px_0_0_#cbd5e1] ${
                         day.date === today ? "bg-sky-50" : "bg-[#f7f7f7]"
                       }`}
                     >
@@ -953,7 +953,7 @@ export default function WeeklyScheduleBoard({
                 {machineRows.map((row) => (
                   <tr key={`${row.machine_id}-${row.shift_category}`}>
                     <td
-                      className={`sticky left-0 z-30 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-white px-2 py-2 align-top font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.08)]`}
+                      className={`sticky left-0 z-10 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-white px-2 py-2 align-top font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.08)]`}
                     >
                       <div className="leading-tight">{row.machine_name}</div>
                       <div className="mt-1 text-[10px] text-muted-foreground">{row.shift_label}</div>
@@ -1021,16 +1021,21 @@ export default function WeeklyScheduleBoard({
         </section>
 
         <Dialog open={!!selectedBlock} onOpenChange={(open) => !open && setSelectedBlock(null)}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="z-[100] max-w-3xl">
             <DialogHeader>
               <DialogTitle>案件詳細</DialogTitle>
             </DialogHeader>
 
             {selectedBlock ? (
               <>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Info label="受注番号" value={selectedBlock.order_number} />
-                  <Info label="品名" value={selectedBlock.product_name} />
+                <div className="rounded-xl border bg-slate-50 p-4">
+                  <div className="grid gap-3 md:grid-cols-[140px_1fr]">
+                    <Info label="受注番号" value={getSafeOrderNumber(selectedBlock)} compact />
+                    <Info label="品名" value={selectedBlock.product_name} compact strong />
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
                   <Info label="得意先" value={selectedBlock.customer_name} />
                   <Info label="部品" value={selectedBlock.part_name} />
                   <Info label="ユニット" value={selectedBlock.unit_name} />
@@ -1045,6 +1050,10 @@ export default function WeeklyScheduleBoard({
                   <Info label="順番" value={selectedBlock.sequence_no ? String(selectedBlock.sequence_no) : null} />
                   <Info label="状態" value={getStatusLabel(selectedBlock.block_status)} />
                   <Info label="元ファイル" value={selectedBlock.source_file_name} />
+                </div>
+
+                <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  この画面は、割当済み案件の内容確認と「未割当に戻す」操作用です。
                 </div>
 
                 <div className="mt-6 flex justify-end gap-2">
@@ -1615,11 +1624,33 @@ function CheckCell({
   )
 }
 
-function Info({ label, value }: { label: string; value?: string | null }) {
+function getSafeOrderNumber(block: ScheduleBlockRow) {
+  const value = block.order_number?.trim()
+
+  // まれにAPI側の取得結果で order_number にヘッダー文字列が混入した場合、
+  // 画面上で「印刷機」などを受注番号として表示しないための保険です。
+  if (!value || ["印刷機", "日勤", "夜勤"].includes(value)) return null
+
+  return value
+}
+
+function Info({
+  label,
+  value,
+  compact = false,
+  strong = false,
+}: {
+  label: string
+  value?: string | null
+  compact?: boolean
+  strong?: boolean
+}) {
   return (
-    <div className="rounded-lg border p-3">
+    <div className={`rounded-lg border bg-white ${compact ? "p-2.5" : "p-3"}`}>
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 text-sm font-medium break-words">{value || "-"}</div>
+      <div className={`mt-1 break-words ${strong ? "text-base font-bold" : "text-sm font-medium"}`}>
+        {value || "-"}
+      </div>
     </div>
   )
 }
