@@ -288,8 +288,9 @@ export default function WeeklyScheduleBoard({
   const [showUnassignedOnly, setShowUnassignedOnly] = React.useState(true)
   const [machineFilter, setMachineFilter] = React.useState<string>("all")
   const [selectedBlock, setSelectedBlock] = React.useState<ScheduleBlockRow | null>(null)
-  const [selectedUnassignedBlock, setSelectedUnassignedBlock] =
-    React.useState<ScheduleBlockRow | null>(null)
+  const [selectedUnassignedBlockIds, setSelectedUnassignedBlockIds] = React.useState<Set<string>>(
+    () => new Set(),
+  )
   const [draggingBlock, setDraggingBlock] = React.useState<ScheduleBlockRow | null>(null)
 
   const topScrollRef = React.useRef<HTMLDivElement | null>(null)
@@ -354,6 +355,45 @@ export default function WeeklyScheduleBoard({
       return (!item.machine_id || !item.scheduled_date) && (!q || haystack.includes(q))
     })
   }, [data.unassignedBlocks, query, showUnassignedOnly])
+
+  const selectedUnassignedBlocks = React.useMemo(() => {
+    if (selectedUnassignedBlockIds.size === 0) return []
+
+    const selectedIds = selectedUnassignedBlockIds
+    return data.unassignedBlocks.filter((item) => selectedIds.has(item.block_id))
+  }, [data.unassignedBlocks, selectedUnassignedBlockIds])
+
+  const selectedUnassignedCount = selectedUnassignedBlocks.length
+
+  React.useEffect(() => {
+    setSelectedUnassignedBlockIds((current) => {
+      if (current.size === 0) return current
+
+      const existingIds = new Set(data.unassignedBlocks.map((item) => item.block_id))
+      const next = new Set(Array.from(current).filter((id) => existingIds.has(id)))
+
+      if (next.size === current.size) return current
+      return next
+    })
+  }, [data.unassignedBlocks])
+
+  function toggleUnassignedSelection(block: ScheduleBlockRow) {
+    setSelectedUnassignedBlockIds((current) => {
+      const next = new Set(current)
+
+      if (next.has(block.block_id)) {
+        next.delete(block.block_id)
+      } else {
+        next.add(block.block_id)
+      }
+
+      return next
+    })
+  }
+
+  function clearUnassignedSelection() {
+    setSelectedUnassignedBlockIds(new Set())
+  }
 
   const machineRows = React.useMemo(() => {
     return data.machineRows.filter((row) => {
@@ -573,6 +613,54 @@ export default function WeeklyScheduleBoard({
     }
   }
 
+  async function handleAssignBlocksToCell({
+    blocks,
+    machineId,
+    date,
+    shiftCategory,
+  }: {
+    blocks: ScheduleBlockRow[]
+    machineId: string
+    date: string
+    shiftCategory: "day" | "night"
+  }) {
+    if (blocks.length === 0) return
+
+    const previousData = data
+    const startSequenceNo = getNextSequenceNo(data, machineId, shiftCategory, date)
+
+    setData((current) =>
+      blocks.reduce((nextData, block, index) => {
+        return moveBlockInCalendarData(nextData, block, {
+          machineId,
+          date,
+          shiftCategory,
+          sequenceNo: startSequenceNo + index,
+        })
+      }, current),
+    )
+    clearUnassignedSelection()
+
+    const results = await Promise.all(
+      blocks.map((block, index) =>
+        updateBlockAssignment({
+          block,
+          machineId,
+          date,
+          shiftCategory,
+          sequenceNo: startSequenceNo + index,
+        }),
+      ),
+    )
+
+    if (results.some((ok) => !ok)) {
+      setData(previousData)
+      return
+    }
+
+    await refreshDataSilently(baseDate)
+  }
+
   async function handleAssignBlockToCell({
     block,
     machineId,
@@ -584,35 +672,14 @@ export default function WeeklyScheduleBoard({
     date: string
     shiftCategory: "day" | "night"
   }) {
-    if (!block) return
+    const blocks = selectedUnassignedBlocks.length > 0 ? selectedUnassignedBlocks : block ? [block] : []
 
-    const previousData = data
-    const sequenceNo = getNextSequenceNo(data, machineId, shiftCategory, date, block.block_id)
-
-    setData((current) =>
-      moveBlockInCalendarData(current, block, {
-        machineId,
-        date,
-        shiftCategory,
-        sequenceNo,
-      }),
-    )
-    setSelectedUnassignedBlock(null)
-
-    const ok = await updateBlockAssignment({
-      block,
+    await handleAssignBlocksToCell({
+      blocks,
       machineId,
       date,
       shiftCategory,
-      sequenceNo,
     })
-
-    if (!ok) {
-      setData(previousData)
-      return
-    }
-
-    await refreshDataSilently(baseDate)
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -631,33 +698,43 @@ export default function WeeklyScheduleBoard({
     const previousData = data
 
     if (dropData.type === "schedule-cell") {
-      const sequenceNo = getNextSequenceNo(
+      const blocksToMove =
+        dragData.source === "unassigned" && selectedUnassignedBlockIds.has(dragData.block.block_id)
+          ? selectedUnassignedBlocks
+          : [dragData.block]
+
+      const startSequenceNo = getNextSequenceNo(
         data,
         dropData.machineId,
         dropData.shiftCategory,
         dropData.date,
-        dragData.block.block_id,
       )
 
       setData((current) =>
-        moveBlockInCalendarData(current, dragData.block, {
-          machineId: dropData.machineId,
-          date: dropData.date,
-          shiftCategory: dropData.shiftCategory,
-          sequenceNo,
-        }),
+        blocksToMove.reduce((nextData, block, index) => {
+          return moveBlockInCalendarData(nextData, block, {
+            machineId: dropData.machineId,
+            date: dropData.date,
+            shiftCategory: dropData.shiftCategory,
+            sequenceNo: startSequenceNo + index,
+          })
+        }, current),
       )
-      setSelectedUnassignedBlock(null)
+      clearUnassignedSelection()
 
-      const ok = await updateBlockAssignment({
-        block: dragData.block,
-        machineId: dropData.machineId,
-        date: dropData.date,
-        shiftCategory: dropData.shiftCategory,
-        sequenceNo,
-      })
+      const results = await Promise.all(
+        blocksToMove.map((block, index) =>
+          updateBlockAssignment({
+            block,
+            machineId: dropData.machineId,
+            date: dropData.date,
+            shiftCategory: dropData.shiftCategory,
+            sequenceNo: startSequenceNo + index,
+          }),
+        ),
+      )
 
-      if (!ok) {
+      if (results.some((ok) => !ok)) {
         setData(previousData)
         return
       }
@@ -750,21 +827,28 @@ export default function WeeklyScheduleBoard({
                 </Button>
               </div>
 
-              {selectedUnassignedBlock ? (
+              {selectedUnassignedCount > 0 ? (
                 <div className="mt-3 rounded-md border border-blue-300 bg-blue-50 p-2 text-xs text-blue-900">
-                  <div className="font-bold">選択中</div>
-                  <div className="mt-1 truncate" title={selectedUnassignedBlock.product_name ?? ""}>
-                    {selectedUnassignedBlock.unit_name} / {selectedUnassignedBlock.product_name ?? "-"}
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => setSelectedUnassignedBlock(null)}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-bold">{selectedUnassignedCount}件選択中</div>
+                    <Button type="button" variant="outline" size="sm" onClick={clearUnassignedSelection}>
                       選択解除
                     </Button>
+                  </div>
+                  <div
+                    className="mt-1 truncate"
+                    title={selectedUnassignedBlocks.map((item) => item.product_name ?? item.unit_name).join(" / ")}
+                  >
+                    {selectedUnassignedBlocks[0]?.unit_name} / {selectedUnassignedBlocks[0]?.product_name ?? "-"}
+                    {selectedUnassignedCount > 1 ? ` ほか${selectedUnassignedCount - 1}件` : ""}
+                  </div>
+                  <div className="mt-1 text-[11px] text-blue-800">
+                    この状態で右の予定セルをクリックすると、選択した案件をまとめて割当できます。
                   </div>
                 </div>
               ) : (
                 <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
-                  未割当案件を選択またはドラッグして、右の予定セルに割当できます。
+                  未割当案件を複数選択、またはドラッグして、右の予定セルに割当できます。
                 </div>
               )}
             </div>
@@ -779,8 +863,8 @@ export default function WeeklyScheduleBoard({
                       key={item.block_id}
                       block={item}
                       source="unassigned"
-                      selected={selectedUnassignedBlock?.block_id === item.block_id}
-                      onSelect={() => setSelectedUnassignedBlock(item)}
+                      selected={selectedUnassignedBlockIds.has(item.block_id)}
+                      onSelect={() => toggleUnassignedSelection(item)}
                     >
                       <UnassignedBlockCard item={item} />
                     </DraggableBlock>
@@ -890,10 +974,10 @@ export default function WeeklyScheduleBoard({
                             machineId={row.machine_id}
                             date={day.date}
                             shiftCategory={row.shift_category}
-                            active={!!selectedUnassignedBlock || !!draggingBlock}
+                            active={selectedUnassignedCount > 0 || !!draggingBlock}
                             onClick={() =>
                               handleAssignBlockToCell({
-                                block: selectedUnassignedBlock,
+                                block: null,
                                 machineId: row.machine_id,
                                 date: day.date,
                                 shiftCategory: row.shift_category,
@@ -981,7 +1065,7 @@ export default function WeeklyScheduleBoard({
       </div>
 
       <DragOverlay>
-        {draggingBlock ? <DragOverlayCard block={draggingBlock} /> : null}
+        {draggingBlock ? <DragOverlayCard block={draggingBlock} count={selectedUnassignedBlockIds.has(draggingBlock.block_id) ? selectedUnassignedCount : 1} /> : null}
       </DragOverlay>
     </DndContext>
   )
@@ -1374,9 +1458,14 @@ function DroppableUnassignedArea({
   )
 }
 
-function DragOverlayCard({ block }: { block: ScheduleBlockRow }) {
+function DragOverlayCard({ block, count = 1 }: { block: ScheduleBlockRow; count?: number }) {
   return (
     <div className="w-[420px] rotate-1 border border-blue-400 bg-white shadow-2xl">
+      {count > 1 ? (
+        <div className="border-b border-blue-200 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-900">
+          {count}件をまとめて移動
+        </div>
+      ) : null}
       {block.machine_id || block.scheduled_date ? (
         <div className="p-2 text-[11px]">
           <div className="font-bold">{block.order_number ?? "-"}</div>
