@@ -941,8 +941,7 @@ export default function WeeklyScheduleBoard({
                       }`}
                     >
                       <div className="leading-tight">
-                        <div>{day.label}</div>
-                        <div className="mt-1 text-xs text-slate-500">{day.weekday}</div>
+                        <div>{day.label}（{day.weekday}）</div>
                       </div>
                     </th>
                   ))}
