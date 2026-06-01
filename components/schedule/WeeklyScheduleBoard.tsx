@@ -174,7 +174,7 @@ function formatDateJP(dateStr: string) {
 }
 
 function getWeekdayJP(dateStr: string) {
-  const weekdays = ["日", "月", "火", "水", "木", "金", "土"]
+  const weekdays = ["（日）", "（月）", "火", "水", "木", "金", "土"]
   return weekdays[new Date(dateStr).getDay()]
 }
 
