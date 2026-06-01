@@ -954,10 +954,10 @@ export default function WeeklyScheduleBoard({
                     <td
   className={`sticky left-0 z-10 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-white px-2 py-2 align-top font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.08)]`}
 >
-  <div className="text-[12px] font-bold leading-tight">
+  <div className="text-[13px] font-bold leading-tight">
     {row.machine_name}
   </div>
-  <div className="mt-1 text-[10px] text-muted-foreground">
+  <div className="mt-1 text-[12px] text-muted-foreground">
     {row.shift_label}
   </div>
 </td>
