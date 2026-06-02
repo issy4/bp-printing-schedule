@@ -1491,11 +1491,16 @@ function DragOverlayCard({ block, count = 1 }: { block: ScheduleBlockRow; count?
 function UnassignedBlockCard({ item }: { item: ScheduleBlockRow }) {
   return (
     <div className="border-b border-slate-400 bg-white text-[12px] leading-tight">
-      <div className="grid grid-cols-[1fr_84px] border-b border-slate-300">
-        <div className="truncate px-2 py-1 font-bold" title={item.product_name ?? ""}>
+      <div className="grid grid-cols-[58px_1fr] border-b border-slate-300">
+        <div className="border-r border-slate-300 px-2 py-1 text-slate-700">
+          品名
+        </div>
+        <div
+          className="truncate px-2 py-1 font-bold"
+          title={item.product_name ?? ""}
+        >
           {item.product_name ?? "-"}
         </div>
-        <div className="border-l border-slate-300 px-2 py-1 text-center font-bold">詳細</div>
       </div>
 
       <div className="grid grid-cols-[58px_1fr_58px_1fr] border-b border-slate-300">
@@ -1509,7 +1514,9 @@ function UnassignedBlockCard({ item }: { item: ScheduleBlockRow }) {
         <div className="border-r border-slate-300 px-2 py-1 text-slate-700">色数</div>
         <div className="border-r border-slate-300 px-2 py-1">{formatColorCount(item)}</div>
         <div className="border-r border-slate-300 px-2 py-1 text-slate-700">特色</div>
-        <div className="truncate px-2 py-1" title={item.color_note ?? ""}>{formatSpecialColor(item)}</div>
+        <div className="truncate px-2 py-1" title={item.color_note ?? ""}>
+          {formatSpecialColor(item)}
+        </div>
       </div>
 
       <div className="grid grid-cols-[58px_1fr_58px_1fr]">
