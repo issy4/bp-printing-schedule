@@ -1513,7 +1513,7 @@ function UnassignedBlockCard({ item }: { item: ScheduleBlockRow }) {
       <div className="grid grid-cols-[58px_1fr_58px_1fr] border-b border-slate-300">
         <div className="border-r border-slate-300 px-2 py-1 text-slate-700">色数</div>
         <div className="border-r border-slate-300 px-2 py-1">{formatColorCount(item)}</div>
-        <div className="border-r border-slate-300 px-2 py-1 text-slate-700">特色</div>
+        <div className="border-r border-slate-300 px-2 py-1 text-slate-700">色指定</div>
         <div className="truncate px-2 py-1" title={item.color_note ?? ""}>
           {formatSpecialColor(item)}
         </div>
