@@ -934,17 +934,16 @@ export default function WeeklyScheduleBoard({
                     印刷機
                   </th>
                   {data.weekDays.map((day) => (
-                    <th
-                      key={day.date}
-                      className={`sticky top-0 z-20 h-16 min-w-[1150px] border border-slate-300 px-2 py-3 text-center text-sm font-bold shadow-[inset_0_-1px_0_#cbd5e1,inset_-1px_0_0_#cbd5e1] ${
-                        day.date === today ? "bg-sky-50" : "bg-[#f7f7f7]"
-                      }`}
-                    >
-                      <div className="leading-tight">
-                        <div>{day.label}（{day.weekday}）</div>
-                      </div>
-                    </th>
-                  ))}
+  <th
+    key={day.date}
+    className="sticky top-0 z-20 h-16 min-w-[1150px] border border-slate-300 px-1 py-2 text-center font-bold shadow-[inset_0_-1px_0_#cbd5e1,inset_-1px_0_0_#cbd5e1]"
+    style={{
+      backgroundColor: getWeekdayHeaderColor(day.weekday),
+    }}
+  >
+    <div>{day.label}（{day.weekday}）</div>
+  </th>
+))}
                 </tr>
               </thead>
 
@@ -1078,6 +1077,27 @@ export default function WeeklyScheduleBoard({
       </DragOverlay>
     </DndContext>
   )
+}
+
+function getWeekdayHeaderColor(weekday: string) {
+  switch (weekday) {
+    case "月":
+      return "#f9e59d"
+    case "火":
+      return "#eea2e4"
+    case "水":
+      return "#b8d8aa"
+    case "木":
+      return "#f1b26d"
+    case "金":
+      return "#a8c2f3"
+    case "土":
+      return "#b4a6d5"
+    case "日":
+      return "#e59898"
+    default:
+      return "#f7f7f7"
+  }
 }
 
 function updateBlockInCalendarData(
