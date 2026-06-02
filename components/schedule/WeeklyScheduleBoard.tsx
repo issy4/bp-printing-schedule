@@ -72,6 +72,7 @@ export type ScheduleBlockRow = {
   color_front: number | null
   color_back: number | null
   color_note: string | null
+  has_special_color: boolean | null
   print_count: number | null
   press_count: number
   imposition: string | null
@@ -137,6 +138,7 @@ type PrintItemProgressField =
   | "paper_stacked"
   | "plate_completed"
   | "pp_processed"
+  | "has_special_color"
 
 type UnitProgressField = "printing_completed"
 
@@ -162,7 +164,7 @@ type UnassignedDropData = {
 }
 
 const SCHEDULE_CELL_GRID =
-  "grid-cols-[44px_72px_240px_34px_34px_34px_34px_90px_58px_52px_90px_72px_90px_90px_34px]"
+  "grid-cols-[44px_72px_240px_34px_34px_34px_34px_90px_58px_52px_90px_34px_72px_90px_90px_34px]"
 
 const SCHEDULE_TABLE_MIN_WIDTH = "min-w-[8200px]"
 const MACHINE_COLUMN_WIDTH = "min-w-[104px]"
@@ -1259,9 +1261,10 @@ export function ScheduleCellHeader() {
       <div className="border-r border-slate-300 px-1 py-0.5 text-center">下版</div>
       <div className="border-r border-slate-300 px-1 py-0.5 text-center">PP</div>
       <div className="border-r border-slate-300 px-1 py-0.5">部品</div>
-      <div className="border-r border-slate-300 px-1 py-0.5">版型</div>
+      <div className="border-r border-slate-300 px-1 py-0.5">サイズ</div>
       <div className="border-r border-slate-300 px-1 py-0.5">色数</div>
-      <div className="border-r border-slate-300 px-1 py-0.5">特色</div>
+      <div className="border-r border-slate-300 px-1 py-0.5">色指定</div>
+      <div className="border-r border-slate-300 px-1 py-0.5 text-center">特色</div>
       <div className="border-r border-slate-300 px-1 py-0.5 text-right">通紙</div>
       <div className="border-r border-slate-300 px-1 py-0.5">特記</div>
       <div className="border-r border-slate-300 px-1 py-0.5">作業時間</div>
@@ -1321,9 +1324,23 @@ export function ScheduleCellItem({
         <Cell className="truncate" title={block.unit_name}>{block.unit_name}</Cell>
         <Cell>{block.plate_size ?? "-"}</Cell>
         <Cell>{formatColorCount(block)}</Cell>
-        <Cell title={formatSpecialColor(block)} className="truncate">{formatSpecialColor(block)}</Cell>
-        <Cell className="justify-end text-right">{compactNumber(block.print_count)}</Cell>
-        <NoteCell value={block.block_note} onSave={(value) => onSaveNote?.(value)} />
+
+<Cell title={formatSpecialColor(block)} className="truncate">
+  {formatSpecialColor(block)}
+</Cell>
+
+<CheckCell
+  checked={!!block.has_special_color}
+  onToggle={() =>
+    onToggleProgress?.("has_special_color", !block.has_special_color)
+  }
+/>
+
+<Cell className="justify-end text-right">
+  {compactNumber(block.print_count)}
+</Cell>
+
+<NoteCell value={block.block_note} onSave={(value) => onSaveNote?.(value)} />
         <Cell className="bg-slate-50 text-slate-400">-</Cell>
         <CheckCell checked={!!block.printing_completed} onToggle={() => onToggleProgress?.("printing_completed", !block.printing_completed)} />
       </div>
