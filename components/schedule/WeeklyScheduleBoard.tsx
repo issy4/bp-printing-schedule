@@ -831,8 +831,8 @@ export default function WeeklyScheduleBoard({
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="grid h-[calc(100vh-120px)] min-h-[760px] grid-cols-[420px_1fr] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
         <DroppableUnassignedArea active={!!draggingBlock && !!draggingBlock.machine_id}>
-          <aside className="flex h-full min-h-0 flex-col overflow-hidden border-r bg-white">
-            <div className="shrink-0 border-b p-4">
+          <aside className="flex h-full min-h-0 flex-col border-r bg-white">
+            <div className="border-b p-4">
               <h2 className="text-lg font-bold tracking-tight">未割当案件</h2>
 
               <div className="relative mt-3">
@@ -882,7 +882,7 @@ export default function WeeklyScheduleBoard({
               )}
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-scroll overscroll-contain">
+            <div className="min-h-0 flex-1 overflow-y-auto">
               {filteredUnassigned.length === 0 ? (
                 <div className="p-6 text-sm text-muted-foreground">未割当案件はありません。</div>
               ) : (
@@ -1532,9 +1532,7 @@ function DroppableUnassignedArea({
   return (
     <div
       ref={setNodeRef}
-      className={`h-full min-h-0 overflow-hidden ${
-  active ? "ring-2 ring-blue-300" : ""
-} ${isOver ? "bg-blue-50 ring-4 ring-blue-400" : ""}`}
+      className={`h-full ${active ? "ring-2 ring-blue-300" : ""} ${isOver ? "bg-blue-50 ring-4 ring-blue-400" : ""}`}
     >
       {children}
     </div>
