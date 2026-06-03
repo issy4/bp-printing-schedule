@@ -831,7 +831,7 @@ export default function WeeklyScheduleBoard({
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="grid h-[calc(100vh-120px)] min-h-[760px] grid-cols-[420px_1fr] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
         <DroppableUnassignedArea active={!!draggingBlock && !!draggingBlock.machine_id}>
-          <aside className="flex h-full flex-col border-r bg-white">
+          <aside className="flex h-full min-h-0 flex-col border-r bg-white">
             <div className="border-b p-4">
               <h2 className="text-lg font-bold tracking-tight">未割当案件</h2>
 
@@ -882,7 +882,7 @@ export default function WeeklyScheduleBoard({
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto">
               {filteredUnassigned.length === 0 ? (
                 <div className="p-6 text-sm text-muted-foreground">未割当案件はありません。</div>
               ) : (
