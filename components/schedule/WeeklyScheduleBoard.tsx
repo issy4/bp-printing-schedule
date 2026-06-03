@@ -443,6 +443,33 @@ export default function WeeklyScheduleBoard({
     void loadData(next)
   }
 
+  async function handleImportLegacyData() {
+  if (!confirm("基幹データから未割当案件を取り込みますか？")) return
+
+  try {
+    setLoading(true)
+    setError(null)
+
+    const res = await fetch("/api/schedule/import-legacy", {
+      method: "POST",
+    })
+
+    const body = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      throw new Error(body.error ?? "基幹データの取込に失敗しました")
+    }
+
+    await loadData(baseDate)
+
+    alert("基幹データの取込が完了しました。")
+  } catch (e) {
+    setError(e instanceof Error ? e.message : "基幹データの取込に失敗しました")
+  } finally {
+    setLoading(false)
+  }
+}
+
   function syncScroll(source: "top" | "body") {
     if (isSyncingScroll.current) return
 
@@ -904,6 +931,14 @@ export default function WeeklyScheduleBoard({
                   ))}
                 </SelectContent>
               </Select>
+
+              <Button
+  variant="secondary"
+  onClick={() => void handleImportLegacyData()}
+  disabled={loading}
+>
+  基幹データ取込
+</Button>
 
               <Button variant="outline" onClick={() => void loadData(baseDate)}>
                 <RefreshCw className="mr-2 h-4 w-4" />
