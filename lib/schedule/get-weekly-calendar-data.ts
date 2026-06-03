@@ -48,10 +48,10 @@ export async function getWeeklyCalendarData(baseDate?: string): Promise<WeeklyCa
     .order("unit_name", { ascending: true }),
 
   supabase
-    .from("machines")
-    .select("id, machine_name, display_order, is_active")
-    .eq("is_active", true)
-    .order("display_order", { ascending: true }),
+  .from("machines")
+  .select("id, machine_name, display_order, is_active, day_shift_enabled, night_shift_enabled")
+  .eq("is_active", true)
+  .order("display_order", { ascending: true }),
 ])
 
   if (weekError) {
@@ -67,24 +67,33 @@ export async function getWeeklyCalendarData(baseDate?: string): Promise<WeeklyCa
   const typedWeekRows = (weekRows ?? []) as ScheduleBlockRow[]
   const typedUnassignedRows = (unassignedRows ?? []) as ScheduleBlockRow[]
 
-  const machineRows: MachineRow[] = (machines ?? []).flatMap((m) => [
-    {
+  const machineRows: MachineRow[] = (machines ?? []).flatMap((m) => {
+  const rows: MachineRow[] = []
+
+  if (m.day_shift_enabled) {
+    rows.push({
       machine_id: m.id,
       machine_name: m.machine_name,
       display_order: m.display_order ?? 0,
       shift_category: "day",
       shift_label: "日勤",
       machine_shift_name: `${m.machine_name} 日勤`,
-    },
-    {
+    })
+  }
+
+  if (m.night_shift_enabled) {
+    rows.push({
       machine_id: m.id,
       machine_name: m.machine_name,
       display_order: m.display_order ?? 0,
       shift_category: "night",
       shift_label: "夜勤",
       machine_shift_name: `${m.machine_name} 夜勤`,
-    },
-  ])
+    })
+  }
+
+  return rows
+})
 
   const cells: Record<string, WeeklyCalendarCell> = {}
 
