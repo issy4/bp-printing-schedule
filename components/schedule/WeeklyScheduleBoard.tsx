@@ -72,6 +72,7 @@ export type ScheduleBlockRow = {
   color_front: number | null
   color_back: number | null
   color_note: string | null
+  has_special_color: boolean | null
   print_count: number | null
   press_count: number
   imposition: string | null
@@ -137,6 +138,7 @@ type PrintItemProgressField =
   | "paper_stacked"
   | "plate_completed"
   | "pp_processed"
+  | "has_special_color"
 
 type UnitProgressField = "printing_completed"
 
@@ -162,7 +164,11 @@ type UnassignedDropData = {
 }
 
 const SCHEDULE_CELL_GRID =
-  "grid-cols-[44px_72px_240px_34px_34px_34px_34px_90px_58px_52px_90px_72px_90px_90px_34px]"
+  "grid-cols-[44px_72px_240px_34px_34px_34px_34px_90px_58px_52px_90px_34px_72px_90px_90px_34px]"
+
+const SCHEDULE_TABLE_MIN_WIDTH = "min-w-[8200px]"
+const MACHINE_COLUMN_WIDTH = "min-w-[104px]"
+const DAY_COLUMN_WIDTH_PX = 1150
 
 function formatDateJP(dateStr: string) {
   const d = new Date(dateStr)
@@ -284,9 +290,15 @@ export default function WeeklyScheduleBoard({
   const [showUnassignedOnly, setShowUnassignedOnly] = React.useState(true)
   const [machineFilter, setMachineFilter] = React.useState<string>("all")
   const [selectedBlock, setSelectedBlock] = React.useState<ScheduleBlockRow | null>(null)
-  const [selectedUnassignedBlock, setSelectedUnassignedBlock] =
-    React.useState<ScheduleBlockRow | null>(null)
+  const [selectedUnassignedBlockIds, setSelectedUnassignedBlockIds] = React.useState<Set<string>>(
+    () => new Set(),
+  )
   const [draggingBlock, setDraggingBlock] = React.useState<ScheduleBlockRow | null>(null)
+
+  const topScrollRef = React.useRef<HTMLDivElement | null>(null)
+  const bodyScrollRef = React.useRef<HTMLDivElement | null>(null)
+  const isSyncingScroll = React.useRef(false)
+  const lastAutoScrolledWeekKey = React.useRef<string | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -346,6 +358,45 @@ export default function WeeklyScheduleBoard({
     })
   }, [data.unassignedBlocks, query, showUnassignedOnly])
 
+  const selectedUnassignedBlocks = React.useMemo(() => {
+    if (selectedUnassignedBlockIds.size === 0) return []
+
+    const selectedIds = selectedUnassignedBlockIds
+    return data.unassignedBlocks.filter((item) => selectedIds.has(item.block_id))
+  }, [data.unassignedBlocks, selectedUnassignedBlockIds])
+
+  const selectedUnassignedCount = selectedUnassignedBlocks.length
+
+  React.useEffect(() => {
+    setSelectedUnassignedBlockIds((current) => {
+      if (current.size === 0) return current
+
+      const existingIds = new Set(data.unassignedBlocks.map((item) => item.block_id))
+      const next = new Set(Array.from(current).filter((id) => existingIds.has(id)))
+
+      if (next.size === current.size) return current
+      return next
+    })
+  }, [data.unassignedBlocks])
+
+  function toggleUnassignedSelection(block: ScheduleBlockRow) {
+    setSelectedUnassignedBlockIds((current) => {
+      const next = new Set(current)
+
+      if (next.has(block.block_id)) {
+        next.delete(block.block_id)
+      } else {
+        next.add(block.block_id)
+      }
+
+      return next
+    })
+  }
+
+  function clearUnassignedSelection() {
+    setSelectedUnassignedBlockIds(new Set())
+  }
+
   const machineRows = React.useMemo(() => {
     return data.machineRows.filter((row) => {
       if (machineFilter === "all") return true
@@ -354,6 +405,29 @@ export default function WeeklyScheduleBoard({
   }, [data.machineRows, machineFilter])
 
   const today = formatYmd(new Date())
+
+  React.useEffect(() => {
+    const todayIndex = data.weekDays.findIndex((day) => day.date === today)
+    const weekKey = data.weekDays.map((day) => day.date).join("|")
+
+    if (todayIndex < 0 || !weekKey || lastAutoScrolledWeekKey.current === weekKey) {
+      return
+    }
+
+    lastAutoScrolledWeekKey.current = weekKey
+
+    requestAnimationFrame(() => {
+      const scrollLeft = todayIndex * DAY_COLUMN_WIDTH_PX
+
+      if (topScrollRef.current) {
+        topScrollRef.current.scrollLeft = scrollLeft
+      }
+
+      if (bodyScrollRef.current) {
+        bodyScrollRef.current.scrollLeft = scrollLeft
+      }
+    })
+  }, [data.weekDays, today])
 
   const goWeek = (direction: -1 | 1) => {
     const base = new Date(baseDate)
@@ -367,6 +441,53 @@ export default function WeeklyScheduleBoard({
     const next = formatYmd(new Date())
     setBaseDate(next)
     void loadData(next)
+  }
+
+  async function handleImportLegacyData() {
+  if (!confirm("基幹データから未割当案件を取り込みますか？")) return
+
+  try {
+    setLoading(true)
+    setError(null)
+
+    const res = await fetch("/api/schedule/import-legacy", {
+      method: "POST",
+    })
+
+    const body = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      throw new Error(body.error ?? "基幹データの取込に失敗しました")
+    }
+
+    await loadData(baseDate)
+
+    alert("基幹データの取込が完了しました。")
+  } catch (e) {
+    setError(e instanceof Error ? e.message : "基幹データの取込に失敗しました")
+  } finally {
+    setLoading(false)
+  }
+}
+
+  function syncScroll(source: "top" | "body") {
+    if (isSyncingScroll.current) return
+
+    const top = topScrollRef.current
+    const body = bodyScrollRef.current
+    if (!top || !body) return
+
+    isSyncingScroll.current = true
+
+    if (source === "top") {
+      body.scrollLeft = top.scrollLeft
+    } else {
+      top.scrollLeft = body.scrollLeft
+    }
+
+    requestAnimationFrame(() => {
+      isSyncingScroll.current = false
+    })
   }
 
   async function handleToggleProgress(
@@ -521,6 +642,54 @@ export default function WeeklyScheduleBoard({
     }
   }
 
+  async function handleAssignBlocksToCell({
+    blocks,
+    machineId,
+    date,
+    shiftCategory,
+  }: {
+    blocks: ScheduleBlockRow[]
+    machineId: string
+    date: string
+    shiftCategory: "day" | "night"
+  }) {
+    if (blocks.length === 0) return
+
+    const previousData = data
+    const startSequenceNo = getNextSequenceNo(data, machineId, shiftCategory, date)
+
+    setData((current) =>
+      blocks.reduce((nextData, block, index) => {
+        return moveBlockInCalendarData(nextData, block, {
+          machineId,
+          date,
+          shiftCategory,
+          sequenceNo: startSequenceNo + index,
+        })
+      }, current),
+    )
+    clearUnassignedSelection()
+
+    const results = await Promise.all(
+      blocks.map((block, index) =>
+        updateBlockAssignment({
+          block,
+          machineId,
+          date,
+          shiftCategory,
+          sequenceNo: startSequenceNo + index,
+        }),
+      ),
+    )
+
+    if (results.some((ok) => !ok)) {
+      setData(previousData)
+      return
+    }
+
+    await refreshDataSilently(baseDate)
+  }
+
   async function handleAssignBlockToCell({
     block,
     machineId,
@@ -532,35 +701,14 @@ export default function WeeklyScheduleBoard({
     date: string
     shiftCategory: "day" | "night"
   }) {
-    if (!block) return
+    const blocks = selectedUnassignedBlocks.length > 0 ? selectedUnassignedBlocks : block ? [block] : []
 
-    const previousData = data
-    const sequenceNo = getNextSequenceNo(data, machineId, shiftCategory, date, block.block_id)
-
-    setData((current) =>
-      moveBlockInCalendarData(current, block, {
-        machineId,
-        date,
-        shiftCategory,
-        sequenceNo,
-      }),
-    )
-    setSelectedUnassignedBlock(null)
-
-    const ok = await updateBlockAssignment({
-      block,
+    await handleAssignBlocksToCell({
+      blocks,
       machineId,
       date,
       shiftCategory,
-      sequenceNo,
     })
-
-    if (!ok) {
-      setData(previousData)
-      return
-    }
-
-    await refreshDataSilently(baseDate)
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -579,33 +727,43 @@ export default function WeeklyScheduleBoard({
     const previousData = data
 
     if (dropData.type === "schedule-cell") {
-      const sequenceNo = getNextSequenceNo(
+      const blocksToMove =
+        dragData.source === "unassigned" && selectedUnassignedBlockIds.has(dragData.block.block_id)
+          ? selectedUnassignedBlocks
+          : [dragData.block]
+
+      const startSequenceNo = getNextSequenceNo(
         data,
         dropData.machineId,
         dropData.shiftCategory,
         dropData.date,
-        dragData.block.block_id,
       )
 
       setData((current) =>
-        moveBlockInCalendarData(current, dragData.block, {
-          machineId: dropData.machineId,
-          date: dropData.date,
-          shiftCategory: dropData.shiftCategory,
-          sequenceNo,
-        }),
+        blocksToMove.reduce((nextData, block, index) => {
+          return moveBlockInCalendarData(nextData, block, {
+            machineId: dropData.machineId,
+            date: dropData.date,
+            shiftCategory: dropData.shiftCategory,
+            sequenceNo: startSequenceNo + index,
+          })
+        }, current),
       )
-      setSelectedUnassignedBlock(null)
+      clearUnassignedSelection()
 
-      const ok = await updateBlockAssignment({
-        block: dragData.block,
-        machineId: dropData.machineId,
-        date: dropData.date,
-        shiftCategory: dropData.shiftCategory,
-        sequenceNo,
-      })
+      const results = await Promise.all(
+        blocksToMove.map((block, index) =>
+          updateBlockAssignment({
+            block,
+            machineId: dropData.machineId,
+            date: dropData.date,
+            shiftCategory: dropData.shiftCategory,
+            sequenceNo: startSequenceNo + index,
+          }),
+        ),
+      )
 
-      if (!ok) {
+      if (results.some((ok) => !ok)) {
         setData(previousData)
         return
       }
@@ -671,9 +829,9 @@ export default function WeeklyScheduleBoard({
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="grid h-full min-h-[760px] grid-cols-[420px_1fr] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
+      <div className="grid h-[calc(100vh-120px)] min-h-[760px] grid-cols-[420px_1fr] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
         <DroppableUnassignedArea active={!!draggingBlock && !!draggingBlock.machine_id}>
-          <aside className="flex h-full flex-col border-r bg-white">
+          <aside className="flex h-full min-h-0 flex-col border-r bg-white">
             <div className="border-b p-4">
               <h2 className="text-lg font-bold tracking-tight">未割当案件</h2>
 
@@ -698,26 +856,33 @@ export default function WeeklyScheduleBoard({
                 </Button>
               </div>
 
-              {selectedUnassignedBlock ? (
+              {selectedUnassignedCount > 0 ? (
                 <div className="mt-3 rounded-md border border-blue-300 bg-blue-50 p-2 text-xs text-blue-900">
-                  <div className="font-bold">選択中</div>
-                  <div className="mt-1 truncate" title={selectedUnassignedBlock.product_name ?? ""}>
-                    {selectedUnassignedBlock.unit_name} / {selectedUnassignedBlock.product_name ?? "-"}
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => setSelectedUnassignedBlock(null)}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-bold">{selectedUnassignedCount}件選択中</div>
+                    <Button type="button" variant="outline" size="sm" onClick={clearUnassignedSelection}>
                       選択解除
                     </Button>
+                  </div>
+                  <div
+                    className="mt-1 truncate"
+                    title={selectedUnassignedBlocks.map((item) => item.product_name ?? item.unit_name).join(" / ")}
+                  >
+                    {selectedUnassignedBlocks[0]?.unit_name} / {selectedUnassignedBlocks[0]?.product_name ?? "-"}
+                    {selectedUnassignedCount > 1 ? ` ほか${selectedUnassignedCount - 1}件` : ""}
+                  </div>
+                  <div className="mt-1 text-[11px] text-blue-800">
+                    この状態で右の予定セルをクリックすると、選択した案件をまとめて割当できます。
                   </div>
                 </div>
               ) : (
                 <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
-                  未割当案件を選択またはドラッグして、右の予定セルに割当できます。
+                  未割当案件を複数選択、またはドラッグして、右の予定セルに割当できます。
                 </div>
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto">
               {filteredUnassigned.length === 0 ? (
                 <div className="p-6 text-sm text-muted-foreground">未割当案件はありません。</div>
               ) : (
@@ -727,8 +892,8 @@ export default function WeeklyScheduleBoard({
                       key={item.block_id}
                       block={item}
                       source="unassigned"
-                      selected={selectedUnassignedBlock?.block_id === item.block_id}
-                      onSelect={() => setSelectedUnassignedBlock(item)}
+                      selected={selectedUnassignedBlockIds.has(item.block_id)}
+                      onSelect={() => toggleUnassignedSelection(item)}
                     >
                       <UnassignedBlockCard item={item} />
                     </DraggableBlock>
@@ -767,6 +932,14 @@ export default function WeeklyScheduleBoard({
                 </SelectContent>
               </Select>
 
+              <Button
+  variant="secondary"
+  onClick={() => void handleImportLegacyData()}
+  disabled={loading}
+>
+  基幹データ取込
+</Button>
+
               <Button variant="outline" onClick={() => void loadData(baseDate)}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 更新
@@ -776,33 +949,54 @@ export default function WeeklyScheduleBoard({
 
           {error ? <div className="p-4 text-sm text-red-600">{error}</div> : null}
 
-          <div className="flex-1 overflow-auto">
-            <table className="min-w-[1800px] border-collapse text-[11px]">
-              <thead className="sticky top-0 z-20 bg-white">
+          <div
+            ref={topScrollRef}
+            onScroll={() => syncScroll("top")}
+            className="h-5 overflow-x-auto overflow-y-hidden border-b bg-slate-50"
+          >
+            <div className={`h-1 ${SCHEDULE_TABLE_MIN_WIDTH}`} />
+          </div>
+
+          <div
+            ref={bodyScrollRef}
+            onScroll={() => syncScroll("body")}
+            className="relative flex-1 overflow-auto bg-white"
+          >
+            <table className={`${SCHEDULE_TABLE_MIN_WIDTH} border-separate border-spacing-0 text-[11px]`}>
+              <thead className="bg-white">
                 <tr>
-                  <th className="sticky left-0 z-30 border border-slate-300 bg-[#f7f7f7] px-1 py-1 text-left font-bold whitespace-nowrap">
+                  <th
+                    className={`sticky left-0 top-0 z-30 h-16 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-[#f7f7f7] px-3 py-3 text-left text-sm font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.10)]`}
+                  >
                     印刷機
                   </th>
                   {data.weekDays.map((day) => (
-                    <th
-                      key={day.date}
-                      className={`border border-slate-300 px-1 py-1 text-center font-bold min-w-[1150px] ${
-                        day.date === today ? "bg-sky-50" : "bg-[#f7f7f7]"
-                      }`}
-                    >
-                      <div>{day.label}({day.weekday})</div>
-                    </th>
-                  ))}
+  <th
+    key={day.date}
+    className="sticky top-0 z-20 h-16 min-w-[1150px] border border-slate-300 px-1 py-2 text-center font-bold shadow-[inset_0_-1px_0_#cbd5e1,inset_-1px_0_0_#cbd5e1]"
+    style={{
+      backgroundColor: getWeekdayHeaderColor(day.weekday),
+    }}
+  >
+    <div>{day.label}（{day.weekday}）</div>
+  </th>
+))}
                 </tr>
               </thead>
 
               <tbody>
                 {machineRows.map((row) => (
                   <tr key={`${row.machine_id}-${row.shift_category}`}>
-                    <td className="sticky left-0 z-10 border border-slate-300 bg-white px-1 py-1 align-top font-bold whitespace-nowrap">
-                      <div>{row.machine_name}</div>
-                      <div className="text-[10px] text-muted-foreground">{row.shift_label}</div>
-                    </td>
+                    <td
+  className={`sticky left-0 z-10 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-white px-2 py-2 align-top font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.08)]`}
+>
+  <div className="text-[13px] font-bold leading-tight">
+    {row.machine_name}
+  </div>
+  <div className="mt-1 text-[12px] text-muted-foreground">
+    {row.shift_label}
+  </div>
+</td>
 
                     {data.weekDays.map((day) => {
                       const key = makeCellKey(row.machine_id, row.shift_category, day.date)
@@ -819,10 +1013,10 @@ export default function WeeklyScheduleBoard({
                             machineId={row.machine_id}
                             date={day.date}
                             shiftCategory={row.shift_category}
-                            active={!!selectedUnassignedBlock || !!draggingBlock}
+                            active={selectedUnassignedCount > 0 || !!draggingBlock}
                             onClick={() =>
                               handleAssignBlockToCell({
-                                block: selectedUnassignedBlock,
+                                block: null,
                                 machineId: row.machine_id,
                                 date: day.date,
                                 shiftCategory: row.shift_category,
@@ -866,30 +1060,36 @@ export default function WeeklyScheduleBoard({
         </section>
 
         <Dialog open={!!selectedBlock} onOpenChange={(open) => !open && setSelectedBlock(null)}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="z-[100] max-w-3xl">
             <DialogHeader>
               <DialogTitle>案件詳細</DialogTitle>
             </DialogHeader>
 
             {selectedBlock ? (
               <>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <Info label="受注番号" value={selectedBlock.order_number} />
-                  <Info label="品名" value={selectedBlock.product_name} />
+                <div className="rounded-xl border bg-slate-50 p-4">
+                  <div className="grid gap-3 md:grid-cols-[140px_1fr]">
+                    <Info label="受注番号" value={getSafeOrderNumber(selectedBlock)} compact />
+                    <Info label="品名" value={selectedBlock.product_name} compact strong />
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
                   <Info label="得意先" value={selectedBlock.customer_name} />
-                  <Info label="部品" value={selectedBlock.part_name} />
-                  <Info label="ユニット" value={selectedBlock.unit_name} />
+                  <Info label="印刷単位" value={formatPrintUnitSummary(selectedBlock)} />
                   <Info label="版型" value={selectedBlock.plate_size} />
                   <Info label="色数" value={`${selectedBlock.color_front ?? "-"}/${selectedBlock.color_back ?? "-"}`} />
                   <Info label="色指定・備考" value={selectedBlock.color_note} />
                   <Info label="通紙" value={selectedBlock.print_count?.toLocaleString("ja-JP")} />
                   <Info label="特記" value={selectedBlock.block_note} />
-                  <Info label="台数" value={String(selectedBlock.press_count)} />
                   <Info label="印刷機" value={selectedBlock.machine_name} />
                   <Info label="日付" value={selectedBlock.scheduled_date} />
                   <Info label="順番" value={selectedBlock.sequence_no ? String(selectedBlock.sequence_no) : null} />
                   <Info label="状態" value={getStatusLabel(selectedBlock.block_status)} />
-                  <Info label="元ファイル" value={selectedBlock.source_file_name} />
+                </div>
+
+                <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  この画面は、割当済み案件の内容確認と「未割当に戻す」操作用です。
                 </div>
 
                 <div className="mt-6 flex justify-end gap-2">
@@ -910,10 +1110,31 @@ export default function WeeklyScheduleBoard({
       </div>
 
       <DragOverlay>
-        {draggingBlock ? <DragOverlayCard block={draggingBlock} /> : null}
+        {draggingBlock ? <DragOverlayCard block={draggingBlock} count={selectedUnassignedBlockIds.has(draggingBlock.block_id) ? selectedUnassignedCount : 1} /> : null}
       </DragOverlay>
     </DndContext>
   )
+}
+
+function getWeekdayHeaderColor(weekday: string) {
+  switch (weekday) {
+    case "月":
+      return "#f9e59d"
+    case "火":
+      return "#eea2e4"
+    case "水":
+      return "#b8d8aa"
+    case "木":
+      return "#f1b26d"
+    case "金":
+      return "#a8c2f3"
+    case "土":
+      return "#b4a6d5"
+    case "日":
+      return "#e59898"
+    default:
+      return "#f7f7f7"
+  }
 }
 
 function updateBlockInCalendarData(
@@ -1075,9 +1296,10 @@ export function ScheduleCellHeader() {
       <div className="border-r border-slate-300 px-1 py-0.5 text-center">下版</div>
       <div className="border-r border-slate-300 px-1 py-0.5 text-center">PP</div>
       <div className="border-r border-slate-300 px-1 py-0.5">部品</div>
-      <div className="border-r border-slate-300 px-1 py-0.5">版型</div>
+      <div className="border-r border-slate-300 px-1 py-0.5">サイズ</div>
       <div className="border-r border-slate-300 px-1 py-0.5">色数</div>
-      <div className="border-r border-slate-300 px-1 py-0.5">特色</div>
+      <div className="border-r border-slate-300 px-1 py-0.5">色指定</div>
+      <div className="border-r border-slate-300 px-1 py-0.5 text-center">特色</div>
       <div className="border-r border-slate-300 px-1 py-0.5 text-right">通紙</div>
       <div className="border-r border-slate-300 px-1 py-0.5">特記</div>
       <div className="border-r border-slate-300 px-1 py-0.5">作業時間</div>
@@ -1137,9 +1359,23 @@ export function ScheduleCellItem({
         <Cell className="truncate" title={block.unit_name}>{block.unit_name}</Cell>
         <Cell>{block.plate_size ?? "-"}</Cell>
         <Cell>{formatColorCount(block)}</Cell>
-        <Cell title={formatSpecialColor(block)} className="truncate">{formatSpecialColor(block)}</Cell>
-        <Cell className="justify-end text-right">{compactNumber(block.print_count)}</Cell>
-        <NoteCell value={block.block_note} onSave={(value) => onSaveNote?.(value)} />
+
+<Cell title={formatSpecialColor(block)} className="truncate">
+  {formatSpecialColor(block)}
+</Cell>
+
+<CheckCell
+  checked={!!block.has_special_color}
+  onToggle={() =>
+    onToggleProgress?.("has_special_color", !block.has_special_color)
+  }
+/>
+
+<Cell className="justify-end text-right">
+  {compactNumber(block.print_count)}
+</Cell>
+
+<NoteCell value={block.block_note} onSave={(value) => onSaveNote?.(value)} />
         <Cell className="bg-slate-50 text-slate-400">-</Cell>
         <CheckCell checked={!!block.printing_completed} onToggle={() => onToggleProgress?.("printing_completed", !block.printing_completed)} />
       </div>
@@ -1270,7 +1506,7 @@ function DroppableScheduleCell({
     <div
       ref={setNodeRef}
       onClick={onClick}
-      className={`min-h-[92px] bg-white ${active ? "cursor-copy hover:bg-blue-50" : ""} ${
+      className={`min-h-[104px] bg-white ${active ? "cursor-copy hover:bg-blue-50" : ""} ${
         isOver ? "bg-blue-100 ring-2 ring-blue-400" : ""
       }`}
     >
@@ -1303,9 +1539,14 @@ function DroppableUnassignedArea({
   )
 }
 
-function DragOverlayCard({ block }: { block: ScheduleBlockRow }) {
+function DragOverlayCard({ block, count = 1 }: { block: ScheduleBlockRow; count?: number }) {
   return (
     <div className="w-[420px] rotate-1 border border-blue-400 bg-white shadow-2xl">
+      {count > 1 ? (
+        <div className="border-b border-blue-200 bg-blue-50 px-2 py-1 text-xs font-bold text-blue-900">
+          {count}件をまとめて移動
+        </div>
+      ) : null}
       {block.machine_id || block.scheduled_date ? (
         <div className="p-2 text-[11px]">
           <div className="font-bold">{block.order_number ?? "-"}</div>
@@ -1322,11 +1563,16 @@ function DragOverlayCard({ block }: { block: ScheduleBlockRow }) {
 function UnassignedBlockCard({ item }: { item: ScheduleBlockRow }) {
   return (
     <div className="border-b border-slate-400 bg-white text-[12px] leading-tight">
-      <div className="grid grid-cols-[1fr_84px] border-b border-slate-300">
-        <div className="truncate px-2 py-1 font-bold" title={item.product_name ?? ""}>
+      <div className="grid grid-cols-[58px_1fr] border-b border-slate-300">
+        <div className="border-r border-slate-300 px-2 py-1 text-slate-700">
+          品名
+        </div>
+        <div
+          className="truncate px-2 py-1 font-bold"
+          title={item.product_name ?? ""}
+        >
           {item.product_name ?? "-"}
         </div>
-        <div className="border-l border-slate-300 px-2 py-1 text-center font-bold">詳細</div>
       </div>
 
       <div className="grid grid-cols-[58px_1fr_58px_1fr] border-b border-slate-300">
@@ -1339,8 +1585,10 @@ function UnassignedBlockCard({ item }: { item: ScheduleBlockRow }) {
       <div className="grid grid-cols-[58px_1fr_58px_1fr] border-b border-slate-300">
         <div className="border-r border-slate-300 px-2 py-1 text-slate-700">色数</div>
         <div className="border-r border-slate-300 px-2 py-1">{formatColorCount(item)}</div>
-        <div className="border-r border-slate-300 px-2 py-1 text-slate-700">特色</div>
-        <div className="truncate px-2 py-1" title={item.color_note ?? ""}>{formatSpecialColor(item)}</div>
+        <div className="border-r border-slate-300 px-2 py-1 text-slate-700">色指定</div>
+        <div className="truncate px-2 py-1" title={item.color_note ?? ""}>
+          {formatSpecialColor(item)}
+        </div>
       </div>
 
       <div className="grid grid-cols-[58px_1fr_58px_1fr]">
@@ -1455,11 +1703,56 @@ function CheckCell({
   )
 }
 
-function Info({ label, value }: { label: string; value?: string | null }) {
+
+function formatPrintUnitSummary(block: ScheduleBlockRow) {
+  const partName = block.part_name?.trim() || null
+  const unitName = block.unit_name?.trim() || null
+  const pressCount = Number.isFinite(block.press_count) ? block.press_count : null
+
+  const unitNo = unitName?.match(/-(\d+)$/)?.[1] ?? null
+
+  if (partName && pressCount && unitNo) {
+    return `${partName}　${pressCount}台中 ${unitNo}台目`
+  }
+
+  if (unitName && partName && pressCount) {
+    return `${unitName}（${partName}／全${pressCount}台）`
+  }
+
+  if (unitName && partName) {
+    return `${unitName}（${partName}）`
+  }
+
+  return unitName || partName || null
+}
+
+function getSafeOrderNumber(block: ScheduleBlockRow) {
+  const value = block.order_number?.trim()
+
+  // まれにAPI側の取得結果で order_number にヘッダー文字列が混入した場合、
+  // 画面上で「印刷機」などを受注番号として表示しないための保険です。
+  if (!value || ["印刷機", "日勤", "夜勤"].includes(value)) return null
+
+  return value
+}
+
+function Info({
+  label,
+  value,
+  compact = false,
+  strong = false,
+}: {
+  label: string
+  value?: string | null
+  compact?: boolean
+  strong?: boolean
+}) {
   return (
-    <div className="rounded-lg border p-3">
+    <div className={`rounded-lg border bg-white ${compact ? "p-2.5" : "p-3"}`}>
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 text-sm font-medium break-words">{value || "-"}</div>
+      <div className={`mt-1 break-words ${strong ? "text-base font-bold" : "text-sm font-medium"}`}>
+        {value || "-"}
+      </div>
     </div>
   )
 }

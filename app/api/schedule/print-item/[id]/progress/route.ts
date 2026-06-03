@@ -15,6 +15,7 @@ export async function PATCH(
     "plate_completed",
     "pp_processed",
     "printing_completed",
+    "has_special_color",
   ]
 
   const updateData: Record<string, boolean> = {}

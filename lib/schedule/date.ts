@@ -7,9 +7,14 @@ function formatYmd(date: Date): string {
 
 export function getWeekRange(baseDate?: string) {
   const today = baseDate ? new Date(baseDate) : new Date()
-  const day = today.getDay() // 0:日曜
+
+  // 月曜始まりにする
+  // getDay(): 日=0, 月=1, 火=2 ... 土=6
+  const day = today.getDay()
+  const diffToMonday = day === 0 ? -6 : 1 - day
+
   const start = new Date(today)
-  start.setDate(today.getDate() - day)
+  start.setDate(today.getDate() + diffToMonday)
 
   const end = new Date(start)
   end.setDate(start.getDate() + 6)

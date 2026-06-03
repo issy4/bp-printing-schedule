@@ -25,30 +25,34 @@ export async function getWeeklyCalendarData(baseDate?: string): Promise<WeeklyCa
   const { start, startYmd, endYmd } = getWeekRange(baseDate)
   const weekDays = buildWeekDays(start)
 
-  const [{ data: weekRows, error: weekError }, { data: unassignedRows, error: unassignedError }, { data: machines, error: machinesError }] =
-    await Promise.all([
-      supabase
-        .from("vw_schedule_blocks_with_shift")
-        .select("*")
-        .gte("scheduled_date", startYmd)
-        .lte("scheduled_date", endYmd)
-        .order("scheduled_date", { ascending: true })
-        .order("display_order", { ascending: true })
-        .order("shift_sort_order", { ascending: true })
-        .order("sequence_no", { ascending: true, nullsFirst: false }),
+  const [
+  { data: weekRows, error: weekError },
+  { data: unassignedRows, error: unassignedError },
+  { data: machines, error: machinesError },
+] = await Promise.all([
+  supabase
+    .from("vw_schedule_blocks_with_details")
+    .select("*")
+    .gte("scheduled_date", startYmd)
+    .lte("scheduled_date", endYmd)
+    .order("scheduled_date", { ascending: true })
+    .order("display_order", { ascending: true })
+    .order("shift_sort_order", { ascending: true })
+    .order("sequence_no", { ascending: true, nullsFirst: false }),
 
-      supabase
-        .from("vw_unassigned_schedule_blocks_with_shift")
-        .select("*")
-        .order("order_number", { ascending: true })
-        .order("unit_name", { ascending: true }),
+  supabase
+    .from("vw_schedule_blocks_with_details")
+    .select("*")
+    .or("block_status.eq.unassigned,scheduled_date.is.null,machine_id.is.null,shift_category.is.null")
+    .order("order_number", { ascending: true })
+    .order("unit_name", { ascending: true }),
 
-      supabase
-        .from("machines")
-        .select("id, machine_name, display_order, is_active")
-        .eq("is_active", true)
-        .order("display_order", { ascending: true }),
-    ])
+  supabase
+    .from("machines")
+    .select("id, machine_name, display_order, is_active")
+    .eq("is_active", true)
+    .order("display_order", { ascending: true }),
+])
 
   if (weekError) {
     throw new Error(`週間予定の取得に失敗しました: ${weekError.message}`)
