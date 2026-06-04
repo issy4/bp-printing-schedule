@@ -862,6 +862,42 @@ export default function WeeklyScheduleBoard({
   }
 }
 
+async function handleCancelSelectedUnassignedBlocks() {
+  const blockIds = Array.from(selectedUnassignedBlockIds)
+
+  if (blockIds.length === 0) return
+
+  if (!confirm(`選択中の${blockIds.length}件を未割当リストから削除しますか？`)) {
+    return
+  }
+
+  try {
+    setLoading(true)
+    setError(null)
+
+    const res = await fetch("/api/schedule/blocks/cancel", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ blockIds }),
+    })
+
+    const body = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      throw new Error(body.error ?? "未割当案件の一括削除に失敗しました")
+    }
+
+    setSelectedUnassignedBlockIds(new Set())
+    await loadData(baseDate)
+  } catch (e) {
+    setError(e instanceof Error ? e.message : "未割当案件の一括削除に失敗しました")
+  } finally {
+    setLoading(false)
+  }
+}
+
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="grid h-[calc(100vh-120px)] min-h-[760px] grid-cols-[420px_1fr] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
@@ -895,9 +931,25 @@ export default function WeeklyScheduleBoard({
                 <div className="mt-3 rounded-md border border-blue-300 bg-blue-50 p-2 text-xs text-blue-900">
                   <div className="flex items-center justify-between gap-2">
                     <div className="font-bold">{selectedUnassignedCount}件選択中</div>
-                    <Button type="button" variant="outline" size="sm" onClick={clearUnassignedSelection}>
-                      選択解除
-                    </Button>
+                    <div className="flex items-center gap-2">
+  <Button
+    type="button"
+    variant="outline"
+    size="sm"
+    onClick={clearUnassignedSelection}
+  >
+    選択解除
+  </Button>
+
+  <Button
+    type="button"
+    variant="destructive"
+    size="sm"
+    onClick={() => void handleCancelSelectedUnassignedBlocks()}
+  >
+    選択分を削除
+  </Button>
+</div>
                   </div>
                   <div
                     className="mt-1 truncate"
