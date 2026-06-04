@@ -1418,6 +1418,8 @@ export function ScheduleCellItem({
   onToggleProgress?: (field: ProgressField, checked: boolean) => void
   onSaveNote?: (note: string) => void
 }) {
+  const completed = !!block.printing_completed
+
   return (
     <div
       role="button"
@@ -1432,49 +1434,108 @@ export function ScheduleCellItem({
           onClick?.()
         }
       }}
-      className="block w-full cursor-pointer border-b border-slate-300 bg-white text-left text-[11px] hover:bg-slate-50"
+      className={`block w-full cursor-pointer border-b border-slate-300 text-left text-[11px] ${
+        completed ? "bg-[#b7b7b7]" : "bg-white hover:bg-slate-50"
+      }`}
     >
       <div
-  className={`grid ${SCHEDULE_CELL_GRID} border-b border-slate-300 text-[11px] ${
-    block.printing_completed
-      ? "bg-[#b7b7b7] text-slate-600 [&>*]:bg-[#b7b7b7]"
-      : "bg-white text-slate-900"
-  }`}
->
+        className={`grid ${SCHEDULE_CELL_GRID} border-b border-slate-300 text-[11px] ${
+          completed
+            ? "bg-[#b7b7b7] text-slate-700 [&>*]:bg-[#b7b7b7]"
+            : "bg-white text-slate-900"
+        }`}
+      >
         <OrderMoveCell
           canMoveUp={!!canMoveUp}
           canMoveDown={!!canMoveDown}
           onMoveUp={onMoveUp}
           onMoveDown={onMoveDown}
         />
+
         <Cell className="font-medium">{block.order_number ?? "-"}</Cell>
-        <Cell title={block.product_name ?? ""} className="truncate">{block.product_name ?? "-"}</Cell>
-        <CheckCell checked={!!block.dtp_completed} onToggle={() => onToggleProgress?.("dtp_completed", !block.dtp_completed)} />
-        <CheckCell checked={!!block.paper_stacked} onToggle={() => onToggleProgress?.("paper_stacked", !block.paper_stacked)} />
-        <CheckCell checked={!!block.plate_completed} onToggle={() => onToggleProgress?.("plate_completed", !block.plate_completed)} />
-        <CheckCell checked={!!block.pp_processed} onToggle={() => onToggleProgress?.("pp_processed", !block.pp_processed)} />
-        <Cell className="truncate" title={block.unit_name}>{block.unit_name}</Cell>
+
+        <Cell title={block.product_name ?? ""} className="truncate">
+          {block.product_name ?? "-"}
+        </Cell>
+
+        <CheckCell
+          checked={!!block.dtp_completed}
+          completed={completed}
+          onToggle={() =>
+            onToggleProgress?.("dtp_completed", !block.dtp_completed)
+          }
+        />
+
+        <CheckCell
+          checked={!!block.paper_stacked}
+          completed={completed}
+          onToggle={() =>
+            onToggleProgress?.("paper_stacked", !block.paper_stacked)
+          }
+        />
+
+        <CheckCell
+          checked={!!block.plate_completed}
+          completed={completed}
+          onToggle={() =>
+            onToggleProgress?.("plate_completed", !block.plate_completed)
+          }
+        />
+
+        <CheckCell
+          checked={!!block.pp_processed}
+          completed={completed}
+          onToggle={() =>
+            onToggleProgress?.("pp_processed", !block.pp_processed)
+          }
+        />
+
+        <Cell className="truncate" title={block.unit_name}>
+          {block.unit_name}
+        </Cell>
+
         <Cell>{block.plate_size ?? "-"}</Cell>
+
         <Cell>{formatColorCount(block)}</Cell>
 
-<Cell title={formatSpecialColor(block)} className="truncate">
-  {formatSpecialColor(block)}
-</Cell>
+        <Cell title={formatSpecialColor(block)} className="truncate">
+          {formatSpecialColor(block)}
+        </Cell>
 
-<CheckCell
-  checked={!!block.has_special_color}
-  onToggle={() =>
-    onToggleProgress?.("has_special_color", !block.has_special_color)
-  }
-/>
+        <CheckCell
+          checked={!!block.has_special_color}
+          completed={completed}
+          onToggle={() =>
+            onToggleProgress?.("has_special_color", !block.has_special_color)
+          }
+        />
 
-<Cell className="justify-end text-right">
-  {compactNumber(block.print_count)}
-</Cell>
+        <Cell className="justify-end text-right">
+          {compactNumber(block.print_count)}
+        </Cell>
 
-<NoteCell value={block.block_note} onSave={(value) => onSaveNote?.(value)} />
-        <Cell className="bg-slate-50 text-slate-400">-</Cell>
-        <CheckCell checked={!!block.printing_completed} onToggle={() => onToggleProgress?.("printing_completed", !block.printing_completed)} />
+        <NoteCell value={block.block_note} onSave={(value) => onSaveNote?.(value)} />
+
+        <Cell
+          className={
+            completed
+              ? "bg-[#b7b7b7] text-slate-600"
+              : "bg-slate-50 text-slate-400"
+          }
+        >
+          -
+        </Cell>
+
+        <CheckCell
+          checked={!!block.printing_completed}
+          completed={completed}
+          onToggle={() =>
+            onToggleProgress?.(
+              "printing_completed",
+              !block.printing_completed,
+            )
+          }
+        />
       </div>
     </div>
   )
@@ -1803,28 +1864,28 @@ function NoteCell({
 
 function CheckCell({
   checked,
+  completed,
   onToggle,
 }: {
   checked: boolean
+  completed?: boolean
   onToggle?: () => void
 }) {
   return (
-    <div className="flex items-center justify-center border-r border-slate-300 px-1 py-0.5">
-      <button
-        type="button"
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation()
-          onToggle?.()
-        }}
-        className={`inline-flex h-4 w-4 items-center justify-center border text-[10px] ${
-          checked
-            ? "border-slate-800 bg-slate-800 text-white"
-            : "border-slate-400 bg-white text-transparent hover:bg-slate-100"
+    <div
+      className={`flex items-center justify-center border-r border-slate-300 px-1 py-0.5 ${
+        completed ? "bg-[#b7b7b7]" : ""
+      }`}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onToggle}
+        onClick={(e) => e.stopPropagation()}
+        className={`h-4 w-4 ${
+          completed ? "opacity-60 accent-slate-500" : "accent-slate-900"
         }`}
-      >
-        ✓
-      </button>
+      />
     </div>
   )
 }
