@@ -1437,7 +1437,7 @@ export function ScheduleCellItem({
       <div
   className={`grid ${SCHEDULE_CELL_GRID} border-b border-slate-300 text-[11px] ${
     block.printing_completed
-      ? "bg-slate-100 text-slate-500"
+      ? "bg-slate-200 text-slate-500"
       : "bg-white"
   }`}
 >
