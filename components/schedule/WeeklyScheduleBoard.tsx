@@ -902,7 +902,7 @@ async function handleCancelSelectedUnassignedBlocks() {
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div
-  className={`grid h-[calc(100vh-120px)] min-h-[760px] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm ${
+  className={`grid h-[calc(100vh-80px)] min-h-[820px] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm ${
     unassignedCollapsed ? "grid-cols-[48px_1fr]" : "grid-cols-[420px_1fr]"
   }`}
 >
