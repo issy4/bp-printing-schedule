@@ -294,6 +294,7 @@ export default function WeeklyScheduleBoard({
     () => new Set(),
   )
   const [draggingBlock, setDraggingBlock] = React.useState<ScheduleBlockRow | null>(null)
+  const [unassignedCollapsed, setUnassignedCollapsed] = React.useState(false)
 
   const topScrollRef = React.useRef<HTMLDivElement | null>(null)
   const bodyScrollRef = React.useRef<HTMLDivElement | null>(null)
@@ -900,100 +901,148 @@ async function handleCancelSelectedUnassignedBlocks() {
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="grid h-[calc(100vh-120px)] min-h-[760px] grid-cols-[420px_1fr] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
+      <div
+  className={`grid h-[calc(100vh-120px)] min-h-[760px] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm ${
+    unassignedCollapsed ? "grid-cols-[48px_1fr]" : "grid-cols-[420px_1fr]"
+  }`}
+>
         <DroppableUnassignedArea active={!!draggingBlock && !!draggingBlock.machine_id}>
-          <aside className="flex h-full min-h-0 flex-col overflow-hidden border-r bg-white">
-            <div className="shrink-0 border-b p-4">
-              <h2 className="text-lg font-bold tracking-tight">未割当案件</h2>
+  {unassignedCollapsed ? (
+    <aside className="flex h-full min-h-0 flex-col items-center border-r bg-slate-50 px-1 py-3">
+      <button
+        type="button"
+        onClick={() => setUnassignedCollapsed(false)}
+        className="rounded-md border bg-white px-2 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-100"
+        title="未割当案件を表示"
+      >
+        開
+      </button>
 
-              <div className="relative mt-3">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="検索…"
-                  className="pl-9"
-                />
-              </div>
+      <div className="mt-4 text-[11px] font-bold text-slate-500 [writing-mode:vertical-rl]">
+        未割当
+      </div>
 
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-                <span className="text-muted-foreground">フィルタ:</span>
+      {filteredUnassigned.length > 0 ? (
+        <div className="mt-4 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
+          {filteredUnassigned.length}
+        </div>
+      ) : null}
+    </aside>
+  ) : (
+    <aside className="flex h-full min-h-0 flex-col overflow-hidden border-r bg-white">
+      <div className="shrink-0 border-b p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-bold tracking-tight">未割当案件</h2>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setUnassignedCollapsed(true)}
+          >
+            閉じる
+          </Button>
+        </div>
+
+        <div className="relative mt-3">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="検索…"
+            className="pl-9"
+          />
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">フィルタ:</span>
+          <Button
+            variant={showUnassignedOnly ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setShowUnassignedOnly((v) => !v)}
+          >
+            未割当のみ
+          </Button>
+        </div>
+
+        {selectedUnassignedCount > 0 ? (
+          <div className="mt-3 rounded-md border border-blue-300 bg-blue-50 p-2 text-xs text-blue-900">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-bold">{selectedUnassignedCount}件選択中</div>
+
+              <div className="flex items-center gap-2">
                 <Button
-                  variant={showUnassignedOnly ? "secondary" : "outline"}
+                  type="button"
+                  variant="outline"
                   size="sm"
-                  onClick={() => setShowUnassignedOnly((v) => !v)}
+                  onClick={clearUnassignedSelection}
                 >
-                  未割当のみ
+                  選択解除
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => void handleCancelSelectedUnassignedBlocks()}
+                >
+                  選択分を削除
                 </Button>
               </div>
-
-              {selectedUnassignedCount > 0 ? (
-                <div className="mt-3 rounded-md border border-blue-300 bg-blue-50 p-2 text-xs text-blue-900">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="font-bold">{selectedUnassignedCount}件選択中</div>
-                    <div className="flex items-center gap-2">
-  <Button
-    type="button"
-    variant="outline"
-    size="sm"
-    onClick={clearUnassignedSelection}
-  >
-    選択解除
-  </Button>
-
-  <Button
-    type="button"
-    variant="destructive"
-    size="sm"
-    onClick={() => void handleCancelSelectedUnassignedBlocks()}
-  >
-    選択分を削除
-  </Button>
-</div>
-                  </div>
-                  <div
-                    className="mt-1 truncate"
-                    title={selectedUnassignedBlocks.map((item) => item.product_name ?? item.unit_name).join(" / ")}
-                  >
-                    {selectedUnassignedBlocks[0]?.unit_name} / {selectedUnassignedBlocks[0]?.product_name ?? "-"}
-                    {selectedUnassignedCount > 1 ? ` ほか${selectedUnassignedCount - 1}件` : ""}
-                  </div>
-                  <div className="mt-1 text-[11px] text-blue-800">
-                    この状態で右の予定セルをクリックすると、選択した案件をまとめて割当できます。
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
-                  未割当案件を複数選択、またはドラッグして、右の予定セルに割当できます。
-                </div>
-              )}
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-scroll overscroll-contain">
-              {filteredUnassigned.length === 0 ? (
-                <div className="p-6 text-sm text-muted-foreground">未割当案件はありません。</div>
-              ) : (
-                <div className="divide-y">
-                  {filteredUnassigned.map((item) => (
-                    <DraggableBlock
-                      key={item.block_id}
-                      block={item}
-                      source="unassigned"
-                      selected={selectedUnassignedBlockIds.has(item.block_id)}
-                      onSelect={() => toggleUnassignedSelection(item)}
-                    >
-                      <UnassignedBlockCard
-  item={item}
-  selected={selectedUnassignedBlockIds.has(item.block_id)}
-  onCancel={() => handleCancelUnassignedBlock(item)}
-/>
-                    </DraggableBlock>
-                  ))}
-                </div>
-              )}
+            <div
+              className="mt-1 truncate"
+              title={selectedUnassignedBlocks
+                .map((item) => item.product_name ?? item.unit_name)
+                .join(" / ")}
+            >
+              {selectedUnassignedBlocks[0]?.unit_name} /{" "}
+              {selectedUnassignedBlocks[0]?.product_name ?? "-"}
+              {selectedUnassignedCount > 1
+                ? ` ほか${selectedUnassignedCount - 1}件`
+                : ""}
             </div>
-          </aside>
-        </DroppableUnassignedArea>
+
+            <div className="mt-1 text-[11px] text-blue-800">
+              この状態で右の予定セルをクリックすると、選択した案件をまとめて割当できます。
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
+            未割当案件を複数選択、またはドラッグして、右の予定セルに割当できます。
+          </div>
+        )}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-scroll overscroll-contain">
+        {filteredUnassigned.length === 0 ? (
+          <div className="p-6 text-sm text-muted-foreground">
+            未割当案件はありません。
+          </div>
+        ) : (
+          <div className="divide-y">
+            {filteredUnassigned.map((item) => (
+              <DraggableBlock
+                key={item.block_id}
+                block={item}
+                source="unassigned"
+                selected={selectedUnassignedBlockIds.has(item.block_id)}
+                onSelect={() => toggleUnassignedSelection(item)}
+              >
+                <UnassignedBlockCard
+                  item={item}
+                  selected={selectedUnassignedBlockIds.has(item.block_id)}
+                  onCancel={() => handleCancelUnassignedBlock(item)}
+                />
+              </DraggableBlock>
+            ))}
+          </div>
+        )}
+      </div>
+    </aside>
+  )}
+</DroppableUnassignedArea>
 
         <section className="flex min-w-0 flex-col overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b p-3">
