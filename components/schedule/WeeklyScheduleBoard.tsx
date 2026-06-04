@@ -1664,8 +1664,12 @@ function DroppableScheduleCell({
     <div
       ref={setNodeRef}
       onClick={onClick}
-      className={`min-h-[104px] bg-white ${active ? "cursor-copy hover:bg-blue-50" : ""} ${
-        isOver ? "bg-blue-100 ring-2 ring-blue-400" : ""
+      className={`min-h-[104px] transition-all ${
+        isOver
+          ? "cursor-copy bg-blue-100 ring-2 ring-inset ring-blue-500"
+          : active
+            ? "cursor-copy bg-blue-50/40 hover:bg-blue-50"
+            : "bg-white"
       }`}
     >
       {children}
