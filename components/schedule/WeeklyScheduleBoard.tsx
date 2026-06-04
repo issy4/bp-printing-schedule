@@ -827,6 +827,41 @@ export default function WeeklyScheduleBoard({
     await refreshDataSilently(baseDate)
   }
 
+  async function handleCancelUnassignedBlock(block: ScheduleBlockRow) {
+  const label = `${block.order_number ?? ""} / ${block.product_name ?? block.unit_name ?? ""}`
+
+  if (!confirm(`この未割当案件をリストから削除しますか？\n\n${label}`)) {
+    return
+  }
+
+  try {
+    setLoading(true)
+    setError(null)
+
+    const res = await fetch(`/api/schedule/block/${block.block_id}/cancel`, {
+      method: "PATCH",
+    })
+
+    const body = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      throw new Error(body.error ?? "未割当案件の削除に失敗しました")
+    }
+
+    setSelectedUnassignedBlockIds((prev) => {
+      const next = new Set(prev)
+      next.delete(block.block_id)
+      return next
+    })
+
+    await loadData(baseDate)
+  } catch (e) {
+    setError(e instanceof Error ? e.message : "未割当案件の削除に失敗しました")
+  } finally {
+    setLoading(false)
+  }
+}
+
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="grid h-[calc(100vh-120px)] min-h-[760px] grid-cols-[420px_1fr] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
@@ -895,7 +930,11 @@ export default function WeeklyScheduleBoard({
                       selected={selectedUnassignedBlockIds.has(item.block_id)}
                       onSelect={() => toggleUnassignedSelection(item)}
                     >
-                      <UnassignedBlockCard item={item} />
+                      <UnassignedBlockCard
+  item={item}
+  selected={selectedUnassignedBlockIds.has(item.block_id)}
+  onCancel={() => handleCancelUnassignedBlock(item)}
+/>
                     </DraggableBlock>
                   ))}
                 </div>
@@ -1562,19 +1601,46 @@ function DragOverlayCard({ block, count = 1 }: { block: ScheduleBlockRow; count?
   )
 }
 
-function UnassignedBlockCard({ item }: { item: ScheduleBlockRow }) {
+function UnassignedBlockCard({
+  item,
+  selected,
+  onCancel,
+}: {
+  item: ScheduleBlockRow
+  selected?: boolean
+  onCancel?: () => void
+}) {
   return (
-    <div className="border-b border-slate-400 bg-white text-[12px] leading-tight">
-      <div className="grid grid-cols-[58px_1fr] border-b border-slate-300">
+    <div
+      className={`border-b text-[12px] leading-tight transition-colors ${
+        selected
+          ? "border-blue-400 bg-blue-50 ring-2 ring-inset ring-blue-400"
+          : "border-slate-400 bg-white hover:bg-slate-50"
+      }`}
+    >
+      <div className="grid grid-cols-[58px_1fr_42px] border-b border-slate-300">
         <div className="border-r border-slate-300 px-2 py-1 text-slate-700">
           品名
         </div>
+
         <div
           className="truncate px-2 py-1 font-bold"
           title={item.product_name ?? ""}
         >
           {item.product_name ?? "-"}
         </div>
+
+        <button
+          type="button"
+          className="border-l border-slate-300 px-1 py-1 text-[11px] text-red-600 hover:bg-red-50"
+          onClick={(e) => {
+            e.stopPropagation()
+            onCancel?.()
+          }}
+          title="未割当リストから削除"
+        >
+          削除
+        </button>
       </div>
 
       <div className="grid grid-cols-[58px_1fr_58px_1fr] border-b border-slate-300">

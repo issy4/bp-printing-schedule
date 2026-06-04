@@ -41,11 +41,11 @@ export async function getWeeklyCalendarData(baseDate?: string): Promise<WeeklyCa
     .order("sequence_no", { ascending: true, nullsFirst: false }),
 
   supabase
-    .from("vw_schedule_blocks_with_details")
-    .select("*")
-    .or("block_status.eq.unassigned,scheduled_date.is.null,machine_id.is.null,shift_category.is.null")
-    .order("order_number", { ascending: true })
-    .order("unit_name", { ascending: true }),
+  .from("vw_schedule_blocks_with_details")
+  .select("*")
+  .eq("block_status", "unassigned")
+  .order("order_number", { ascending: true })
+  .order("unit_name", { ascending: true }),
 
   supabase
   .from("machines")
