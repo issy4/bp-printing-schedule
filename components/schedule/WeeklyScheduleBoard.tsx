@@ -164,7 +164,7 @@ type UnassignedDropData = {
 }
 
 const SCHEDULE_CELL_GRID =
-  "grid-cols-[44px_72px_240px_34px_34px_34px_34px_130px_58px_52px_90px_34px_72px_90px_90px_34px]"
+  "grid-cols-[44px_72px_240px_34px_34px_34px_34px_120px_58px_52px_90px_34px_72px_90px_90px_34px]"
 
 const SCHEDULE_TABLE_MIN_WIDTH = "min-w-[8200px]"
 const MACHINE_COLUMN_WIDTH = "min-w-[104px]"
@@ -1437,8 +1437,8 @@ export function ScheduleCellItem({
       <div
   className={`grid ${SCHEDULE_CELL_GRID} border-b border-slate-300 text-[11px] ${
     block.printing_completed
-      ? "bg-slate-200 text-slate-500"
-      : "bg-white"
+      ? "bg-[#b7b7b7] text-slate-600 [&>*]:bg-[#b7b7b7]"
+      : "bg-white text-slate-900"
   }`}
 >
         <OrderMoveCell
