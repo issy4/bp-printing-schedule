@@ -395,7 +395,6 @@ const dayColumnWidthPx = isMachineFocused
 
   const selectedUnassignedCount = selectedUnassignedBlocks.length
 
- const isMachineFocused = machineFilter !== "all"
 const scheduleCellGrid = isMachineFocused ? SCHEDULE_CELL_GRID_FOCUSED : SCHEDULE_CELL_GRID
 const scheduleTableMinWidth = isMachineFocused
   ? SCHEDULE_TABLE_MIN_WIDTH_FOCUSED
