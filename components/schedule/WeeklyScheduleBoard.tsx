@@ -304,6 +304,9 @@ export default function WeeklyScheduleBoard({
   const [selectedUnassignedBlockIds, setSelectedUnassignedBlockIds] = React.useState<Set<string>>(
     () => new Set(),
   )
+  const [selectedAssignedBlockIds, setSelectedAssignedBlockIds] = React.useState<Set<string>>(
+  () => new Set(),
+)
   const [draggingBlock, setDraggingBlock] = React.useState<ScheduleBlockRow | null>(null)
   const [unassignedCollapsed, setUnassignedCollapsed] = React.useState(false)
 
@@ -420,6 +423,24 @@ const dayColumnWidthPx = isMachineFocused
       return next
     })
   }
+
+  function toggleAssignedSelection(block: ScheduleBlockRow) {
+  setSelectedAssignedBlockIds((current) => {
+    const next = new Set(current)
+
+    if (next.has(block.block_id)) {
+      next.delete(block.block_id)
+    } else {
+      next.add(block.block_id)
+    }
+
+    return next
+  })
+}
+
+function clearAssignedSelection() {
+  setSelectedAssignedBlockIds(new Set())
+}
 
   function clearUnassignedSelection() {
     setSelectedUnassignedBlockIds(new Set())
@@ -904,6 +925,60 @@ const dayColumnWidthPx = isMachineFocused
   }
 }
 
+async function handleUnassignSelectedAssignedBlocks(blocks: ScheduleBlockRow[]) {
+  const selectedBlocks = blocks.filter((block) =>
+    selectedAssignedBlockIds.has(block.block_id),
+  )
+
+  if (selectedBlocks.length === 0) return
+
+  if (!confirm(`選択中の${selectedBlocks.length}件を未割当に戻しますか？`)) {
+    return
+  }
+
+  const previousData = data
+  const blockIds = selectedBlocks.map((block) => block.block_id)
+
+  try {
+    setLoading(true)
+    setError(null)
+
+    let nextData = data
+
+    for (const block of selectedBlocks) {
+      nextData = moveBlockInCalendarData(nextData, block, {
+        machineId: null,
+        date: null,
+        shiftCategory: null,
+      })
+    }
+
+    setData(nextData)
+
+    const res = await fetch("/api/schedule/blocks/unassign", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ blockIds }),
+    })
+
+    const body = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      throw new Error(body.error ?? "選択案件の未割当処理に失敗しました")
+    }
+
+    setSelectedAssignedBlockIds(new Set())
+    await refreshDataSilently(baseDate)
+  } catch (e) {
+    setData(previousData)
+    setError(e instanceof Error ? e.message : "選択案件の未割当処理に失敗しました")
+  } finally {
+    setLoading(false)
+  }
+}
+
   async function handleCancelUnassignedBlock(block: ScheduleBlockRow) {
   const label = `${block.order_number ?? ""} / ${block.product_name ?? block.unit_name ?? ""}`
 
@@ -1249,18 +1324,53 @@ style={{
                                 <div className="flex items-center justify-between border-b border-slate-300 bg-slate-50 px-2 py-1">
   <div className="text-[11px] font-bold text-slate-700">
     {cell.blocks.length}件
+    {cell.blocks.some((block) => selectedAssignedBlockIds.has(block.block_id)) ? (
+      <span className="ml-2 text-blue-700">
+        選択中 {
+          cell.blocks.filter((block) => selectedAssignedBlockIds.has(block.block_id)).length
+        }件
+      </span>
+    ) : null}
   </div>
 
-  <button
-    type="button"
-    className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-100"
-    onClick={(e) => {
-      e.stopPropagation()
-      void handleUnassignCellBlocks(cell.blocks)
-    }}
-  >
-    このセルを未割当へ
-  </button>
+  <div className="flex items-center gap-1">
+    {cell.blocks.some((block) => selectedAssignedBlockIds.has(block.block_id)) ? (
+      <>
+        <button
+          type="button"
+          className="rounded border border-blue-300 bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 hover:bg-blue-100"
+          onClick={(e) => {
+            e.stopPropagation()
+            void handleUnassignSelectedAssignedBlocks(cell.blocks)
+          }}
+        >
+          選択分を未割当へ
+        </button>
+
+        <button
+          type="button"
+          className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-600 hover:bg-slate-100"
+          onClick={(e) => {
+            e.stopPropagation()
+            clearAssignedSelection()
+          }}
+        >
+          選択解除
+        </button>
+      </>
+    ) : null}
+
+    <button
+      type="button"
+      className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-100"
+      onClick={(e) => {
+        e.stopPropagation()
+        void handleUnassignCellBlocks(cell.blocks)
+      }}
+    >
+      このセルを未割当へ
+    </button>
+  </div>
 </div>
 
 <ScheduleCellHeader
@@ -1272,17 +1382,25 @@ style={{
   {cell.blocks.map((block, index) => (
     <DraggableBlock key={block.block_id} block={block} source="assigned">
       <ScheduleCellItem
-        block={block}
-        gridClass={scheduleCellGrid}
-        focused={isMachineFocused}
-        canMoveUp={index > 0}
-        canMoveDown={index < cell.blocks.length - 1}
-        onMoveUp={() => handleMoveBlockOrder(block, "up")}
-        onMoveDown={() => handleMoveBlockOrder(block, "down")}
-        onClick={() => setSelectedBlock(block)}
-        onToggleProgress={(field, checked) => handleToggleProgress(block, field, checked)}
-        onSaveNote={(note) => handleSaveNote(block, note)}
-      />
+  block={block}
+  gridClass={scheduleCellGrid}
+  focused={isMachineFocused}
+  selected={selectedAssignedBlockIds.has(block.block_id)}
+  canMoveUp={index > 0}
+  canMoveDown={index < cell.blocks.length - 1}
+  onMoveUp={() => handleMoveBlockOrder(block, "up")}
+  onMoveDown={() => handleMoveBlockOrder(block, "down")}
+  onClick={(event) => {
+    if (event.ctrlKey || event.metaKey) {
+      toggleAssignedSelection(block)
+      return
+    }
+
+    setSelectedBlock(block)
+  }}
+  onToggleProgress={(field, checked) => handleToggleProgress(block, field, checked)}
+  onSaveNote={(note) => handleSaveNote(block, note)}
+/>
     </DraggableBlock>
   ))}
 </div>
@@ -1571,17 +1689,19 @@ export function ScheduleCellItem({
   onSaveNote,
   gridClass = SCHEDULE_CELL_GRID,
   focused = false,
+  selected = false,
 }: {
   block: ScheduleBlockRow
   canMoveUp?: boolean
   canMoveDown?: boolean
   onMoveUp?: () => void
   onMoveDown?: () => void
-  onClick?: () => void
+  onClick?: (event: React.MouseEvent<HTMLDivElement>) => void
   onToggleProgress?: (field: ProgressField, checked: boolean) => void
   onSaveNote?: (note: string) => void
   gridClass?: string
   focused?: boolean
+  selected?: boolean
 }) {
   const completed = !!block.printing_completed
 
@@ -1591,17 +1711,20 @@ export function ScheduleCellItem({
       tabIndex={0}
       onClick={(e) => {
         e.stopPropagation()
-        onClick?.()
+        onClick?.(e)
       }}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.stopPropagation()
-          onClick?.()
-        }
-      }}
+  if (e.key === "Enter" || e.key === " ") {
+    e.stopPropagation()
+  }
+}}
       className={`block w-full cursor-pointer border-b border-slate-300 text-left text-[11px] ${
-        completed ? "bg-[#b7b7b7]" : "bg-white hover:bg-slate-50"
-      }`}
+  completed
+  ? "bg-[#b7b7b7] text-slate-700 [&>*]:bg-[#b7b7b7]"
+  : selected
+    ? "bg-blue-50 text-slate-900 [&>*]:bg-blue-50"
+    : "bg-white text-slate-900"
+}`}
     >
       <div
         className={`grid ${gridClass} border-b border-slate-300 ${
