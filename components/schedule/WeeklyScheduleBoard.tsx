@@ -1722,7 +1722,7 @@ export function ScheduleCellItem({
   completed
     ? "bg-[#b7b7b7]"
     : selected
-      ? "bg-blue-50 ring-2 ring-inset ring-blue-400"
+      ? "bg-blue-200 ring-2 ring-inset ring-blue-600"
       : "bg-white hover:bg-slate-50"
 }`}
     >
@@ -1730,12 +1730,12 @@ export function ScheduleCellItem({
         className={`grid ${gridClass} border-b border-slate-300 ${
   focused ? "text-[12px]" : "text-[11px]"
 } ${
-          completed
-  ? "bg-[#b7b7b7] text-slate-700 [&>*]:bg-[#b7b7b7]"
-  : selected
-    ? "bg-blue-50 text-slate-900 [&>*]:bg-blue-50"
-    : "bg-white text-slate-900"
-        }`}
+  completed
+    ? "bg-[#b7b7b7] text-slate-700 [&>*]:bg-[#b7b7b7]"
+    : selected
+      ? "bg-blue-200 text-slate-950 [&>*]:bg-blue-200"
+      : "bg-white text-slate-900"
+}`}
       >
         <OrderMoveCell
           canMoveUp={!!canMoveUp}
