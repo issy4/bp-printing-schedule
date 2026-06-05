@@ -181,22 +181,6 @@ const DAY_COLUMN_WIDTH_PX_FOCUSED = 1450
 const SCHEDULE_CELL_MIN_HEIGHT = 104
 const SCHEDULE_CELL_MIN_HEIGHT_FOCUSED = 180
 
-const isMachineFocused = machineFilter !== "all"
-const scheduleCellGrid = isMachineFocused ? SCHEDULE_CELL_GRID_FOCUSED : SCHEDULE_CELL_GRID
-const scheduleTableMinWidth = isMachineFocused
-  ? SCHEDULE_TABLE_MIN_WIDTH_FOCUSED
-  : SCHEDULE_TABLE_MIN_WIDTH
-const machineColumnWidth = isMachineFocused
-  ? MACHINE_COLUMN_WIDTH_FOCUSED
-  : MACHINE_COLUMN_WIDTH
-const dayColumnWidthPx = isMachineFocused
-  ? DAY_COLUMN_WIDTH_PX_FOCUSED
-  : DAY_COLUMN_WIDTH_PX
-
-const scheduleCellMinHeight = isMachineFocused
-  ? SCHEDULE_CELL_MIN_HEIGHT_FOCUSED
-  : SCHEDULE_CELL_MIN_HEIGHT
-
 function formatDateJP(dateStr: string) {
   const d = new Date(dateStr)
   return `${d.getMonth() + 1}/${d.getDate()}`
@@ -322,6 +306,22 @@ export default function WeeklyScheduleBoard({
   )
   const [draggingBlock, setDraggingBlock] = React.useState<ScheduleBlockRow | null>(null)
   const [unassignedCollapsed, setUnassignedCollapsed] = React.useState(false)
+
+  const isMachineFocused = machineFilter !== "all"
+const scheduleCellGrid = isMachineFocused ? SCHEDULE_CELL_GRID_FOCUSED : SCHEDULE_CELL_GRID
+const scheduleTableMinWidth = isMachineFocused
+  ? SCHEDULE_TABLE_MIN_WIDTH_FOCUSED
+  : SCHEDULE_TABLE_MIN_WIDTH
+const machineColumnWidth = isMachineFocused
+  ? MACHINE_COLUMN_WIDTH_FOCUSED
+  : MACHINE_COLUMN_WIDTH
+const dayColumnWidthPx = isMachineFocused
+  ? DAY_COLUMN_WIDTH_PX_FOCUSED
+  : DAY_COLUMN_WIDTH_PX
+
+  const scheduleCellMinHeight = isMachineFocused
+  ? SCHEDULE_CELL_MIN_HEIGHT_FOCUSED
+  : SCHEDULE_CELL_MIN_HEIGHT
 
   const topScrollRef = React.useRef<HTMLDivElement | null>(null)
   const bodyScrollRef = React.useRef<HTMLDivElement | null>(null)
