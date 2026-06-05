@@ -1722,8 +1722,8 @@ export function ScheduleCellItem({
   completed
   ? "bg-[#b7b7b7] text-slate-700 [&>*]:bg-[#b7b7b7]"
   : selected
-    ? "bg-yellow-100 ring-2 ring-inset ring-yellow-500"
-    : "bg-white hover:bg-slate-50"
+    ? "bg-yellow-100 ring-2 ring-inset ring-yellow-100"
+    : "bg-white hover:bg-slate-900"
 }`}
     >
       <div
