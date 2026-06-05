@@ -178,6 +178,25 @@ const MACHINE_COLUMN_WIDTH_FOCUSED = "min-w-[120px]"
 const DAY_COLUMN_WIDTH_PX = 1150
 const DAY_COLUMN_WIDTH_PX_FOCUSED = 1450
 
+const SCHEDULE_CELL_MIN_HEIGHT = 104
+const SCHEDULE_CELL_MIN_HEIGHT_FOCUSED = 180
+
+const isMachineFocused = machineFilter !== "all"
+const scheduleCellGrid = isMachineFocused ? SCHEDULE_CELL_GRID_FOCUSED : SCHEDULE_CELL_GRID
+const scheduleTableMinWidth = isMachineFocused
+  ? SCHEDULE_TABLE_MIN_WIDTH_FOCUSED
+  : SCHEDULE_TABLE_MIN_WIDTH
+const machineColumnWidth = isMachineFocused
+  ? MACHINE_COLUMN_WIDTH_FOCUSED
+  : MACHINE_COLUMN_WIDTH
+const dayColumnWidthPx = isMachineFocused
+  ? DAY_COLUMN_WIDTH_PX_FOCUSED
+  : DAY_COLUMN_WIDTH_PX
+
+const scheduleCellMinHeight = isMachineFocused
+  ? SCHEDULE_CELL_MIN_HEIGHT_FOCUSED
+  : SCHEDULE_CELL_MIN_HEIGHT
+
 function formatDateJP(dateStr: string) {
   const d = new Date(dateStr)
   return `${d.getMonth() + 1}/${d.getDate()}`
@@ -1150,13 +1169,14 @@ style={{
                   <tr key={`${row.machine_id}-${row.shift_category}`}>
                     <td
   className={`sticky left-0 z-10 ${machineColumnWidth} border border-slate-300 bg-white px-2 py-2 align-top font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.08)]`}
+  style={{ height: scheduleCellMinHeight }}
 >
-  <div className="text-[13px] font-bold leading-tight">
-    {row.machine_name}
-  </div>
-  <div className="mt-1 text-[12px] text-muted-foreground">
-    {row.shift_label}
-  </div>
+  <div className={`${isMachineFocused ? "text-[16px]" : "text-[13px]"} font-bold leading-tight`}>
+  {row.machine_name}
+</div>
+<div className={`mt-1 ${isMachineFocused ? "text-[13px]" : "text-[12px]"} text-muted-foreground`}>
+  {row.shift_label}
+</div>
 </td>
 
                     {data.weekDays.map((day) => {
@@ -1175,6 +1195,7 @@ style={{
                             date={day.date}
                             shiftCategory={row.shift_category}
                             active={selectedUnassignedCount > 0 || !!draggingBlock}
+                            minHeight={scheduleCellMinHeight}
                             onClick={() =>
                               handleAssignBlockToCell({
                                 block: null,
@@ -1731,6 +1752,7 @@ function DroppableScheduleCell({
   date,
   shiftCategory,
   active,
+  minHeight = SCHEDULE_CELL_MIN_HEIGHT,
   onClick,
   children,
 }: {
@@ -1755,9 +1777,10 @@ function DroppableScheduleCell({
     <div
       ref={setNodeRef}
       onClick={onClick}
-      className={`relative min-h-[104px] ${
-        active ? "cursor-copy" : ""
-      }`}
+      className={`relative ${
+  active ? "cursor-copy" : ""
+}`}
+style={{ minHeight }}
     >
       {children}
 
