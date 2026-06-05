@@ -393,18 +393,7 @@ const dayColumnWidthPx = isMachineFocused
     return data.unassignedBlocks.filter((item) => selectedIds.has(item.block_id))
   }, [data.unassignedBlocks, selectedUnassignedBlockIds])
 
-  const selectedUnassignedCount = selectedUnassignedBlocks.length
-
-const scheduleCellGrid = isMachineFocused ? SCHEDULE_CELL_GRID_FOCUSED : SCHEDULE_CELL_GRID
-const scheduleTableMinWidth = isMachineFocused
-  ? SCHEDULE_TABLE_MIN_WIDTH_FOCUSED
-  : SCHEDULE_TABLE_MIN_WIDTH
-const machineColumnWidth = isMachineFocused
-  ? MACHINE_COLUMN_WIDTH_FOCUSED
-  : MACHINE_COLUMN_WIDTH
-const dayColumnWidthPx = isMachineFocused
-  ? DAY_COLUMN_WIDTH_PX_FOCUSED
-  : DAY_COLUMN_WIDTH_PX 
+  const selectedUnassignedCount = selectedUnassignedBlocks.length 
 
   React.useEffect(() => {
     setSelectedUnassignedBlockIds((current) => {
