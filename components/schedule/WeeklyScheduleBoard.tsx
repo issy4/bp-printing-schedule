@@ -1720,10 +1720,10 @@ export function ScheduleCellItem({
 }}
       className={`block w-full cursor-pointer border-b border-slate-300 text-left text-[11px] ${
   completed
-  ? "bg-[#b7b7b7] text-slate-700 [&>*]:bg-[#b7b7b7]"
-  : selected
-    ? "bg-yellow-100 ring-2 ring-inset ring-yellow-100"
-    : "bg-white hover:bg-slate-900"
+    ? "bg-[#b7b7b7]"
+    : selected
+      ? "bg-blue-50 ring-2 ring-inset ring-blue-400"
+      : "bg-white hover:bg-slate-50"
 }`}
     >
       <div
@@ -1731,8 +1731,10 @@ export function ScheduleCellItem({
   focused ? "text-[12px]" : "text-[11px]"
 } ${
           completed
-            ? "bg-[#b7b7b7] text-slate-700 [&>*]:bg-[#b7b7b7]"
-            : "bg-white text-slate-900"
+  ? "bg-[#b7b7b7] text-slate-700 [&>*]:bg-[#b7b7b7]"
+  : selected
+    ? "bg-blue-50 text-slate-900 [&>*]:bg-blue-50"
+    : "bg-white text-slate-900"
         }`}
       >
         <OrderMoveCell
