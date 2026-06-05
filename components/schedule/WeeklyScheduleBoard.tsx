@@ -855,6 +855,55 @@ const dayColumnWidthPx = isMachineFocused
     await refreshDataSilently(baseDate)
   }
 
+  async function handleUnassignCellBlocks(blocks: ScheduleBlockRow[]) {
+  if (blocks.length === 0) return
+
+  const label = `${blocks[0]?.machine_name ?? ""} / ${blocks[0]?.scheduled_date ?? ""} / ${blocks[0]?.shift_label ?? ""}`
+
+  if (!confirm(`このセルの案件 ${blocks.length}件を未割当に戻しますか？\n\n${label}`)) {
+    return
+  }
+
+  const previousData = data
+  const blockIds = blocks.map((block) => block.block_id)
+
+  try {
+    setLoading(true)
+    setError(null)
+
+    let nextData = data
+    for (const block of blocks) {
+      nextData = moveBlockInCalendarData(nextData, block, {
+        machineId: null,
+        date: null,
+        shiftCategory: null,
+      })
+    }
+    setData(nextData)
+
+    const res = await fetch("/api/schedule/blocks/unassign", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ blockIds }),
+    })
+
+    const body = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      throw new Error(body.error ?? "一括未割当処理に失敗しました")
+    }
+
+    await refreshDataSilently(baseDate)
+  } catch (e) {
+    setData(previousData)
+    setError(e instanceof Error ? e.message : "一括未割当処理に失敗しました")
+  } finally {
+    setLoading(false)
+  }
+}
+
   async function handleCancelUnassignedBlock(block: ScheduleBlockRow) {
   const label = `${block.order_number ?? ""} / ${block.product_name ?? block.unit_name ?? ""}`
 
@@ -1197,28 +1246,46 @@ style={{
                               <div className="pt-6 text-center text-xs text-muted-foreground">読み込み中…</div>
                             ) : cell?.blocks.length ? (
                               <>
-                                <ScheduleCellHeader
+                                <div className="flex items-center justify-between border-b border-slate-300 bg-slate-50 px-2 py-1">
+  <div className="text-[11px] font-bold text-slate-700">
+    {cell.blocks.length}件
+  </div>
+
+  <button
+    type="button"
+    className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-100"
+    onClick={(e) => {
+      e.stopPropagation()
+      void handleUnassignCellBlocks(cell.blocks)
+    }}
+  >
+    このセルを未割当へ
+  </button>
+</div>
+
+<ScheduleCellHeader
   gridClass={scheduleCellGrid}
   focused={isMachineFocused}
 />
-                                <div className="space-y-0">
-                                  {cell.blocks.map((block, index) => (
-                                    <DraggableBlock key={block.block_id} block={block} source="assigned">
-                                      <ScheduleCellItem
-  block={block}
-  gridClass={scheduleCellGrid}
-  focused={isMachineFocused}
-  canMoveUp={index > 0}
-  canMoveDown={index < cell.blocks.length - 1}
-  onMoveUp={() => handleMoveBlockOrder(block, "up")}
-  onMoveDown={() => handleMoveBlockOrder(block, "down")}
-  onClick={() => setSelectedBlock(block)}
-  onToggleProgress={(field, checked) => handleToggleProgress(block, field, checked)}
-  onSaveNote={(note) => handleSaveNote(block, note)}
-/>
-                                    </DraggableBlock>
-                                  ))}
-                                </div>
+
+<div className="space-y-0">
+  {cell.blocks.map((block, index) => (
+    <DraggableBlock key={block.block_id} block={block} source="assigned">
+      <ScheduleCellItem
+        block={block}
+        gridClass={scheduleCellGrid}
+        focused={isMachineFocused}
+        canMoveUp={index > 0}
+        canMoveDown={index < cell.blocks.length - 1}
+        onMoveUp={() => handleMoveBlockOrder(block, "up")}
+        onMoveDown={() => handleMoveBlockOrder(block, "down")}
+        onClick={() => setSelectedBlock(block)}
+        onToggleProgress={(field, checked) => handleToggleProgress(block, field, checked)}
+        onSaveNote={(note) => handleSaveNote(block, note)}
+      />
+    </DraggableBlock>
+  ))}
+</div>
                               </>
                             ) : (
                               <div className="pt-6 text-center text-xs text-muted-foreground">-</div>
