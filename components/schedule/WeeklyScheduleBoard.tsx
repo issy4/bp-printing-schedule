@@ -166,9 +166,17 @@ type UnassignedDropData = {
 const SCHEDULE_CELL_GRID =
   "grid-cols-[44px_72px_240px_34px_34px_34px_34px_120px_58px_52px_90px_34px_72px_90px_90px_34px]"
 
+const SCHEDULE_CELL_GRID_FOCUSED =
+  "grid-cols-[52px_90px_360px_42px_42px_42px_42px_170px_80px_70px_130px_44px_96px_130px_110px_44px]"
+
 const SCHEDULE_TABLE_MIN_WIDTH = "min-w-[8200px]"
+const SCHEDULE_TABLE_MIN_WIDTH_FOCUSED = "min-w-[10400px]"
+
 const MACHINE_COLUMN_WIDTH = "min-w-[104px]"
+const MACHINE_COLUMN_WIDTH_FOCUSED = "min-w-[120px]"
+
 const DAY_COLUMN_WIDTH_PX = 1150
+const DAY_COLUMN_WIDTH_PX_FOCUSED = 1450
 
 function formatDateJP(dateStr: string) {
   const d = new Date(dateStr)
@@ -368,6 +376,18 @@ export default function WeeklyScheduleBoard({
 
   const selectedUnassignedCount = selectedUnassignedBlocks.length
 
+ const isMachineFocused = machineFilter !== "all"
+const scheduleCellGrid = isMachineFocused ? SCHEDULE_CELL_GRID_FOCUSED : SCHEDULE_CELL_GRID
+const scheduleTableMinWidth = isMachineFocused
+  ? SCHEDULE_TABLE_MIN_WIDTH_FOCUSED
+  : SCHEDULE_TABLE_MIN_WIDTH
+const machineColumnWidth = isMachineFocused
+  ? MACHINE_COLUMN_WIDTH_FOCUSED
+  : MACHINE_COLUMN_WIDTH
+const dayColumnWidthPx = isMachineFocused
+  ? DAY_COLUMN_WIDTH_PX_FOCUSED
+  : DAY_COLUMN_WIDTH_PX 
+
   React.useEffect(() => {
     setSelectedUnassignedBlockIds((current) => {
       if (current.size === 0) return current
@@ -418,7 +438,7 @@ export default function WeeklyScheduleBoard({
     lastAutoScrolledWeekKey.current = weekKey
 
     requestAnimationFrame(() => {
-      const scrollLeft = todayIndex * DAY_COLUMN_WIDTH_PX
+      const scrollLeft = todayIndex * dayColumnWidthPx
 
       if (topScrollRef.current) {
         topScrollRef.current.scrollLeft = scrollLeft
@@ -428,7 +448,7 @@ export default function WeeklyScheduleBoard({
         bodyScrollRef.current.scrollLeft = scrollLeft
       }
     })
-  }, [data.weekDays, today])
+  }, [data.weekDays, today, dayColumnWidthPx])
 
   const goWeek = (direction: -1 | 1) => {
     const base = new Date(baseDate)
@@ -1094,7 +1114,7 @@ async function handleCancelSelectedUnassignedBlocks() {
             onScroll={() => syncScroll("top")}
             className="h-5 overflow-x-auto overflow-y-hidden border-b bg-slate-50"
           >
-            <div className={`h-1 ${SCHEDULE_TABLE_MIN_WIDTH}`} />
+            <div className={`h-1 ${scheduleTableMinWidth}`} />
           </div>
 
           <div
@@ -1102,21 +1122,22 @@ async function handleCancelSelectedUnassignedBlocks() {
             onScroll={() => syncScroll("body")}
             className="relative flex-1 overflow-auto bg-white"
           >
-            <table className={`${SCHEDULE_TABLE_MIN_WIDTH} border-separate border-spacing-0 text-[11px]`}>
+            <table className={`${scheduleTableMinWidth} border-separate border-spacing-0 ${isMachineFocused ? "text-[12px]" : "text-[11px]"}`}>
               <thead className="bg-white">
                 <tr>
                   <th
-                    className={`sticky left-0 top-0 z-30 h-16 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-[#f7f7f7] px-3 py-3 text-left text-sm font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.10)]`}
+                    className={`sticky left-0 top-0 z-30 h-16 ${machineColumnWidth} border border-slate-300 bg-[#f7f7f7] px-3 py-3 text-left text-sm font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.10)]`}
                   >
                     印刷機
                   </th>
                   {data.weekDays.map((day) => (
   <th
     key={day.date}
-    className="sticky top-0 z-20 h-16 min-w-[1150px] border border-slate-300 px-1 py-2 text-center font-bold shadow-[inset_0_-1px_0_#cbd5e1,inset_-1px_0_0_#cbd5e1]"
-    style={{
-      backgroundColor: getWeekdayHeaderColor(day.weekday),
-    }}
+    className="sticky top-0 z-20 h-16 border border-slate-300 px-1 py-2 text-center font-bold shadow-[inset_0_-1px_0_#cbd5e1,inset_-1px_0_0_#cbd5e1]"
+style={{
+  minWidth: `${dayColumnWidthPx}px`,
+  backgroundColor: getWeekdayHeaderColor(day.weekday),
+}}
   >
     <div>{day.label}（{day.weekday}）</div>
   </th>
@@ -1128,7 +1149,7 @@ async function handleCancelSelectedUnassignedBlocks() {
                 {machineRows.map((row) => (
                   <tr key={`${row.machine_id}-${row.shift_category}`}>
                     <td
-  className={`sticky left-0 z-10 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-white px-2 py-2 align-top font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.08)]`}
+  className={`sticky left-0 z-10 ${machineColumnWidth} border border-slate-300 bg-white px-2 py-2 align-top font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.08)]`}
 >
   <div className="text-[13px] font-bold leading-tight">
     {row.machine_name}
@@ -1167,20 +1188,25 @@ async function handleCancelSelectedUnassignedBlocks() {
                               <div className="pt-6 text-center text-xs text-muted-foreground">読み込み中…</div>
                             ) : cell?.blocks.length ? (
                               <>
-                                <ScheduleCellHeader />
+                                <ScheduleCellHeader
+  gridClass={scheduleCellGrid}
+  focused={isMachineFocused}
+/>
                                 <div className="space-y-0">
                                   {cell.blocks.map((block, index) => (
                                     <DraggableBlock key={block.block_id} block={block} source="assigned">
                                       <ScheduleCellItem
-                                        block={block}
-                                        canMoveUp={index > 0}
-                                        canMoveDown={index < cell.blocks.length - 1}
-                                        onMoveUp={() => handleMoveBlockOrder(block, "up")}
-                                        onMoveDown={() => handleMoveBlockOrder(block, "down")}
-                                        onClick={() => setSelectedBlock(block)}
-                                        onToggleProgress={(field, checked) => handleToggleProgress(block, field, checked)}
-                                        onSaveNote={(note) => handleSaveNote(block, note)}
-                                      />
+  block={block}
+  gridClass={scheduleCellGrid}
+  focused={isMachineFocused}
+  canMoveUp={index > 0}
+  canMoveDown={index < cell.blocks.length - 1}
+  onMoveUp={() => handleMoveBlockOrder(block, "up")}
+  onMoveDown={() => handleMoveBlockOrder(block, "down")}
+  onClick={() => setSelectedBlock(block)}
+  onToggleProgress={(field, checked) => handleToggleProgress(block, field, checked)}
+  onSaveNote={(note) => handleSaveNote(block, note)}
+/>
                                     </DraggableBlock>
                                   ))}
                                 </div>
@@ -1425,9 +1451,19 @@ function moveBlockInCalendarData(
   }
 }
 
-export function ScheduleCellHeader() {
+export function ScheduleCellHeader({
+  gridClass = SCHEDULE_CELL_GRID,
+  focused = false,
+}: {
+  gridClass?: string
+  focused?: boolean
+}) {
   return (
-    <div className={`grid ${SCHEDULE_CELL_GRID} border-b border-slate-400 bg-slate-100 text-[10px] font-medium`}>
+    <div
+      className={`grid ${gridClass} border-b border-slate-400 bg-slate-100 ${
+        focused ? "text-[11px]" : "text-[10px]"
+      } font-medium`}
+    >
       <div className="border-r border-slate-300 px-1 py-0.5 text-center">順</div>
       <div className="border-r border-slate-300 px-1 py-0.5">受注</div>
       <div className="border-r border-slate-300 px-1 py-0.5">品名</div>
@@ -1457,6 +1493,8 @@ export function ScheduleCellItem({
   onClick,
   onToggleProgress,
   onSaveNote,
+  gridClass = SCHEDULE_CELL_GRID,
+  focused = false,
 }: {
   block: ScheduleBlockRow
   canMoveUp?: boolean
@@ -1466,6 +1504,8 @@ export function ScheduleCellItem({
   onClick?: () => void
   onToggleProgress?: (field: ProgressField, checked: boolean) => void
   onSaveNote?: (note: string) => void
+  gridClass?: string
+  focused?: boolean
 }) {
   const completed = !!block.printing_completed
 
@@ -1488,7 +1528,9 @@ export function ScheduleCellItem({
       }`}
     >
       <div
-        className={`grid ${SCHEDULE_CELL_GRID} border-b border-slate-300 text-[11px] ${
+        className={`grid ${gridClass} border-b border-slate-300 ${
+  focused ? "text-[12px]" : "text-[11px]"
+} ${
           completed
             ? "bg-[#b7b7b7] text-slate-700 [&>*]:bg-[#b7b7b7]"
             : "bg-white text-slate-900"
