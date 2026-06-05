@@ -1722,7 +1722,7 @@ export function ScheduleCellItem({
   completed
   ? "bg-[#b7b7b7] text-slate-700 [&>*]:bg-[#b7b7b7]"
   : selected
-    ? "bg-blue-50 text-slate-900 [&>*]:bg-blue-50"
+    ? "bg-blue-500 text-slate-900 [&>*]:bg-blue-50"
     : "bg-white text-slate-900"
 }`}
     >
