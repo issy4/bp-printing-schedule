@@ -3,21 +3,25 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const _geist = Geist({ subsets: ['latin'] })
+const _geistMono = Geist_Mono({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: '印刷スケジュール',
+  description: '印刷予定・印刷工程を管理するスケジュールアプリ',
   generator: 'v0.app',
   icons: {
     icon: [
       {
         url: '/icon-light-32x32.png',
+        sizes: '32x32',
+        type: 'image/png',
         media: '(prefers-color-scheme: light)',
       },
       {
         url: '/icon-dark-32x32.png',
+        sizes: '32x32',
+        type: 'image/png',
         media: '(prefers-color-scheme: dark)',
       },
       {
@@ -35,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="ja">
       <body className="font-sans antialiased">
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
