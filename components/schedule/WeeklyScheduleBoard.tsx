@@ -331,6 +331,10 @@ export default function WeeklyScheduleBoard({
   const [selectedAssignedBlockIds, setSelectedAssignedBlockIds] = React.useState<Set<string>>(
   () => new Set(),
 )
+
+// 追加：タブレット用の割当済み案件選択モード
+const [assignedSelectMode, setAssignedSelectMode] = React.useState(false)
+
   const [draggingBlock, setDraggingBlock] = React.useState<ScheduleBlockRow | null>(null)
   const [unassignedCollapsed, setUnassignedCollapsed] = React.useState(false)
 
@@ -1339,6 +1343,25 @@ async function handleCancelSelectedUnassignedBlocks() {
               </Select>
 
               <Button
+  type="button"
+  variant={assignedSelectMode ? "secondary" : "outline"}
+  onClick={() => {
+    setAssignedSelectMode((v) => !v)
+    if (assignedSelectMode) {
+      clearAssignedSelection()
+    }
+  }}
+>
+  {assignedSelectMode ? "選択モード中" : "選択モード"}
+</Button>
+
+{selectedAssignedCount > 0 ? (
+  <span className="text-sm font-bold text-blue-700">
+    選択中 {selectedAssignedCount}件
+  </span>
+) : null}
+
+              <Button
   variant="secondary"
   onClick={() => void handleImportLegacyData()}
   disabled={loading}
@@ -1348,7 +1371,7 @@ async function handleCancelSelectedUnassignedBlocks() {
 
               <Button variant="outline" onClick={() => void loadData(baseDate)}>
                 <RefreshCw className="mr-2 h-4 w-4" />
-                更新
+                表示更新
               </Button>
             </div>
           </div>
@@ -1515,13 +1538,13 @@ style={{
           onMoveUp={() => handleMoveBlockOrder(block, "up")}
           onMoveDown={() => handleMoveBlockOrder(block, "down")}
           onClick={(event) => {
-            if (event.ctrlKey || event.metaKey) {
-              toggleAssignedSelection(block)
-              return
-            }
+  if (assignedSelectMode || event.ctrlKey || event.metaKey) {
+    toggleAssignedSelection(block)
+    return
+  }
 
-            setSelectedBlock(block)
-          }}
+  setSelectedBlock(block)
+}}
           onToggleProgress={(field, checked) =>
             handleToggleProgress(block, field, checked)
           }
