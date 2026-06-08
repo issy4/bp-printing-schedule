@@ -635,6 +635,11 @@ function clearAssignedSelection() {
 
     await refreshDataSilently(baseDate)
 
+    if (action === "start" || action === "stop") {
+      setSelectedBlock(null)
+      return
+    }
+
     if (selectedBlock?.block_id === block.block_id) {
       setSelectedBlock((current) =>
         current
@@ -643,6 +648,8 @@ function clearAssignedSelection() {
               actual_start_at: body.data?.actual_start_at ?? null,
               actual_end_at: body.data?.actual_end_at ?? null,
               actual_work_minutes: body.data?.actual_work_minutes ?? null,
+              printing_completed: body.data?.printing_completed ?? current.printing_completed,
+              unit_status: body.data?.unit_status ?? current.unit_status,
             }
           : current,
       )
