@@ -43,6 +43,9 @@ export type ScheduleBlockRow = {
   sequence_no: number | null
   planned_print_count: number | null
   block_note: string | null
+  actual_start_at: string | null
+  actual_end_at: string | null
+  actual_work_minutes: number | null
   block_status:
     | "unassigned"
     | "tentative"
@@ -229,6 +232,27 @@ function makeCellKey(machineId: string, shiftCategory: string, date: string) {
 function compactNumber(value: number | null) {
   if (value == null) return "-"
   return value.toLocaleString("ja-JP")
+}
+
+function formatDateTimeJP(value?: string | null) {
+  if (!value) return "-"
+  const d = new Date(value)
+
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(
+    d.getMinutes(),
+  ).padStart(2, "0")}`
+}
+
+function formatWorkMinutes(value?: number | null) {
+  if (value == null) return "-"
+
+  const hours = Math.floor(value / 60)
+  const minutes = value % 60
+
+  if (hours <= 0) return `${minutes}分`
+  if (minutes === 0) return `${hours}時間`
+
+  return `${hours}時間${minutes}分`
 }
 
 function formatColorCount(item: ScheduleBlockRow) {
@@ -584,6 +608,52 @@ function clearAssignedSelection() {
       alert("特記の保存に失敗しました。")
     }
   }
+
+  async function handleWorkTimeAction(
+  block: ScheduleBlockRow,
+  action: "start" | "stop" | "clear",
+) {
+  const previousData = data
+
+  try {
+    setLoading(true)
+    setError(null)
+
+    const res = await fetch(`/api/schedule/block/${block.block_id}/work-time`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ action }),
+    })
+
+    const body = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      throw new Error(body.error ?? "作業時間の保存に失敗しました")
+    }
+
+    await refreshDataSilently(baseDate)
+
+    if (selectedBlock?.block_id === block.block_id) {
+      setSelectedBlock((current) =>
+        current
+          ? {
+              ...current,
+              actual_start_at: body.data?.actual_start_at ?? null,
+              actual_end_at: body.data?.actual_end_at ?? null,
+              actual_work_minutes: body.data?.actual_work_minutes ?? null,
+            }
+          : current,
+      )
+    }
+  } catch (e) {
+    setData(previousData)
+    setError(e instanceof Error ? e.message : "作業時間の保存に失敗しました")
+  } finally {
+    setLoading(false)
+  }
+}
 
   async function handleMoveBlockOrder(block: ScheduleBlockRow, direction: "up" | "down") {
     if (!block.machine_id || !block.scheduled_date || !block.shift_category) return
@@ -1448,6 +1518,49 @@ style={{
                   <Info label="状態" value={getStatusLabel(selectedBlock.block_status)} />
                 </div>
 
+                <div className="mt-4 rounded-xl border bg-white p-4">
+  <div className="mb-3 text-sm font-bold">作業記録</div>
+
+  <div className="grid gap-3 md:grid-cols-3">
+    <Info label="開始時刻" value={formatDateTimeJP(selectedBlock.actual_start_at)} />
+    <Info label="停止時刻" value={formatDateTimeJP(selectedBlock.actual_end_at)} />
+    <Info label="作業時間" value={formatWorkMinutes(selectedBlock.actual_work_minutes)} />
+  </div>
+
+  <div className="mt-4 flex flex-wrap justify-end gap-2">
+    <Button
+      type="button"
+      variant="secondary"
+      onClick={() => void handleWorkTimeAction(selectedBlock, "start")}
+      disabled={!!selectedBlock.actual_start_at && !selectedBlock.actual_end_at}
+    >
+      作業開始
+    </Button>
+
+    <Button
+      type="button"
+      variant="secondary"
+      onClick={() => void handleWorkTimeAction(selectedBlock, "stop")}
+      disabled={!selectedBlock.actual_start_at || !!selectedBlock.actual_end_at}
+    >
+      作業停止
+    </Button>
+
+    <Button
+      type="button"
+      variant="outline"
+      onClick={() => {
+        if (confirm("作業時間をクリアしますか？")) {
+          void handleWorkTimeAction(selectedBlock, "clear")
+        }
+      }}
+      disabled={!selectedBlock.actual_start_at && !selectedBlock.actual_end_at}
+    >
+      クリア
+    </Button>
+  </div>
+</div>
+
                 <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                   この画面は、割当済み案件の内容確認と「未割当に戻す」操作用です。
                 </div>
@@ -1809,14 +1922,14 @@ export function ScheduleCellItem({
         <NoteCell value={block.block_note} onSave={(value) => onSaveNote?.(value)} />
 
         <Cell
-          className={
-            completed
-              ? "bg-[#b7b7b7] text-slate-600"
-              : "bg-slate-50 text-slate-400"
-          }
-        >
-          -
-        </Cell>
+  className={
+    completed
+      ? "bg-[#b7b7b7] text-slate-600"
+      : "bg-slate-50 text-slate-700"
+  }
+>
+  {formatWorkMinutes(block.actual_work_minutes)}
+</Cell>
 
         <CheckCell
           checked={!!block.printing_completed}
