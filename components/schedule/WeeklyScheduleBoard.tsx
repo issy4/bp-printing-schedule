@@ -1490,94 +1490,138 @@ style={{
         </section>
 
         <Dialog open={!!selectedBlock} onOpenChange={(open) => !open && setSelectedBlock(null)}>
-          <DialogContent className="z-[100] max-w-3xl">
+          <DialogContent className="z-[100] max-h-[90vh] max-w-3xl overflow-y-auto">
             <DialogHeader>
               <DialogTitle>案件詳細</DialogTitle>
             </DialogHeader>
 
             {selectedBlock ? (
-              <>
-                <div className="rounded-xl border bg-slate-50 p-4">
-                  <div className="grid gap-3 md:grid-cols-[140px_1fr]">
-                    <Info label="受注番号" value={getSafeOrderNumber(selectedBlock)} compact />
-                    <Info label="品名" value={selectedBlock.product_name} compact strong />
-                  </div>
-                </div>
+  <>
+    {/* 重要情報 */}
+    <div className="rounded-xl border bg-slate-50 p-4">
+      <div className="grid gap-3 md:grid-cols-[140px_1fr]">
+        <Info label="受注番号" value={getSafeOrderNumber(selectedBlock)} compact />
+        <Info label="品名" value={selectedBlock.product_name} compact strong />
+      </div>
 
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <Info label="得意先" value={selectedBlock.customer_name} />
-                  <Info label="印刷単位" value={formatPrintUnitSummary(selectedBlock)} />
-                  <Info label="版型" value={selectedBlock.plate_size} />
-                  <Info label="色数" value={`${selectedBlock.color_front ?? "-"}/${selectedBlock.color_back ?? "-"}`} />
-                  <Info label="色指定・備考" value={selectedBlock.color_note} />
-                  <Info label="通紙" value={selectedBlock.print_count?.toLocaleString("ja-JP")} />
-                  <Info label="特記" value={selectedBlock.block_note} />
-                  <Info label="印刷機" value={selectedBlock.machine_name} />
-                  <Info label="日付" value={selectedBlock.scheduled_date} />
-                  <Info label="順番" value={selectedBlock.sequence_no ? String(selectedBlock.sequence_no) : null} />
-                  <Info label="状態" value={getStatusLabel(selectedBlock.block_status)} />
-                </div>
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <Info label="印刷単位" value={formatPrintUnitSummary(selectedBlock)} compact />
+        <Info label="版型" value={selectedBlock.plate_size} compact />
+        <Info
+          label="色数"
+          value={`${selectedBlock.color_front ?? "-"}/${selectedBlock.color_back ?? "-"}`}
+          compact
+        />
+        <Info
+          label="通紙"
+          value={selectedBlock.print_count?.toLocaleString("ja-JP")}
+          compact
+        />
+        <Info label="印刷機" value={selectedBlock.machine_name} compact />
+        <Info label="日付" value={selectedBlock.scheduled_date} compact />
+      </div>
+    </div>
 
-                <div className="mt-4 rounded-xl border bg-white p-4">
-  <div className="mb-3 text-sm font-bold">作業記録</div>
+    {/* 作業記録 */}
+    <div className="mt-4 rounded-xl border bg-white p-3">
+      <div className="mb-2 text-sm font-bold">作業記録</div>
 
-  <div className="grid gap-3 md:grid-cols-3">
-    <Info label="開始時刻" value={formatDateTimeJP(selectedBlock.actual_start_at)} />
-    <Info label="停止時刻" value={formatDateTimeJP(selectedBlock.actual_end_at)} />
-    <Info label="作業時間" value={formatWorkMinutes(selectedBlock.actual_work_minutes)} />
-  </div>
+      <div className="grid grid-cols-3 gap-2 text-sm">
+        <div className="rounded-md border bg-slate-50 p-2">
+          <div className="text-xs text-muted-foreground">開始時刻</div>
+          <div className="font-bold">
+            {formatDateTimeJP(selectedBlock.actual_start_at)}
+          </div>
+        </div>
 
-  <div className="mt-4 flex flex-wrap justify-end gap-2">
-    <Button
-      type="button"
-      variant="secondary"
-      onClick={() => void handleWorkTimeAction(selectedBlock, "start")}
-      disabled={!!selectedBlock.actual_start_at && !selectedBlock.actual_end_at}
-    >
-      作業開始
-    </Button>
+        <div className="rounded-md border bg-slate-50 p-2">
+          <div className="text-xs text-muted-foreground">停止時刻</div>
+          <div className="font-bold">
+            {formatDateTimeJP(selectedBlock.actual_end_at)}
+          </div>
+        </div>
 
-    <Button
-      type="button"
-      variant="secondary"
-      onClick={() => void handleWorkTimeAction(selectedBlock, "stop")}
-      disabled={!selectedBlock.actual_start_at || !!selectedBlock.actual_end_at}
-    >
-      作業停止
-    </Button>
+        <div className="rounded-md border bg-slate-50 p-2">
+          <div className="text-xs text-muted-foreground">作業時間</div>
+          <div className="font-bold">
+            {formatWorkMinutes(selectedBlock.actual_work_minutes)}
+          </div>
+        </div>
+      </div>
 
-    <Button
-      type="button"
-      variant="outline"
-      onClick={() => {
-        if (confirm("作業時間をクリアしますか？")) {
-          void handleWorkTimeAction(selectedBlock, "clear")
-        }
-      }}
-      disabled={!selectedBlock.actual_start_at && !selectedBlock.actual_end_at}
-    >
-      クリア
-    </Button>
-  </div>
-</div>
+      <div className="mt-3 flex justify-end gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => void handleWorkTimeAction(selectedBlock, "start")}
+          disabled={!!selectedBlock.actual_start_at && !selectedBlock.actual_end_at}
+        >
+          作業開始
+        </Button>
 
-                <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  この画面は、割当済み案件の内容確認と「未割当に戻す」操作用です。
-                </div>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => void handleWorkTimeAction(selectedBlock, "stop")}
+          disabled={!selectedBlock.actual_start_at || !!selectedBlock.actual_end_at}
+        >
+          作業停止
+        </Button>
 
-                <div className="mt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setSelectedBlock(null)}>
-                    閉じる
-                  </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            if (confirm("作業時間をクリアしますか？")) {
+              void handleWorkTimeAction(selectedBlock, "clear")
+            }
+          }}
+          disabled={!selectedBlock.actual_start_at && !selectedBlock.actual_end_at}
+        >
+          クリア
+        </Button>
+      </div>
+    </div>
 
-                  {selectedBlock.machine_id || selectedBlock.scheduled_date ? (
-                    <Button type="button" variant="destructive" onClick={() => handleUnassignBlock(selectedBlock)}>
-                      未割当に戻す
-                    </Button>
-                  ) : null}
-                </div>
-              </>
-            ) : null}
+    {/* 詳細情報：折りたたみ */}
+    <details className="mt-4 rounded-xl border bg-white">
+      <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+        詳細情報を表示
+      </summary>
+
+      <div className="grid gap-3 border-t p-4 md:grid-cols-2">
+        <Info label="得意先" value={selectedBlock.customer_name} />
+        <Info label="色指定・備考" value={selectedBlock.color_note} />
+        <Info label="特記" value={selectedBlock.block_note} />
+        <Info
+          label="順番"
+          value={selectedBlock.sequence_no ? String(selectedBlock.sequence_no) : null}
+        />
+        <Info label="状態" value={getStatusLabel(selectedBlock.block_status)} />
+      </div>
+    </details>
+
+    <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+      この画面は、割当済み案件の内容確認、作業時間の記録、「未割当に戻す」操作用です。
+    </div>
+
+    <div className="mt-6 flex justify-end gap-2">
+      <Button type="button" variant="outline" onClick={() => setSelectedBlock(null)}>
+        閉じる
+      </Button>
+
+      {selectedBlock.machine_id || selectedBlock.scheduled_date ? (
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={() => handleUnassignBlock(selectedBlock)}
+        >
+          未割当に戻す
+        </Button>
+      ) : null}
+    </div>
+  </>
+) : null}
           </DialogContent>
         </Dialog>
       </div>
