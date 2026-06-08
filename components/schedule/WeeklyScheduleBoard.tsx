@@ -43,6 +43,9 @@ export type ScheduleBlockRow = {
   sequence_no: number | null
   planned_print_count: number | null
   block_note: string | null
+  actual_start_at: string | null
+  actual_end_at: string | null
+  actual_work_minutes: number | null
   block_status:
     | "unassigned"
     | "tentative"
@@ -164,11 +167,22 @@ type UnassignedDropData = {
 }
 
 const SCHEDULE_CELL_GRID =
-  "grid-cols-[44px_72px_240px_34px_34px_34px_34px_90px_58px_52px_90px_34px_72px_90px_90px_34px]"
+  "grid-cols-[44px_72px_240px_34px_34px_34px_34px_120px_58px_52px_90px_34px_72px_90px_90px_34px]"
+
+const SCHEDULE_CELL_GRID_FOCUSED =
+  "grid-cols-[52px_90px_360px_42px_42px_42px_42px_170px_80px_70px_130px_44px_96px_130px_110px_44px]"
 
 const SCHEDULE_TABLE_MIN_WIDTH = "min-w-[8200px]"
+const SCHEDULE_TABLE_MIN_WIDTH_FOCUSED = "min-w-[10400px]"
+
 const MACHINE_COLUMN_WIDTH = "min-w-[104px]"
+const MACHINE_COLUMN_WIDTH_FOCUSED = "min-w-[120px]"
+
 const DAY_COLUMN_WIDTH_PX = 1150
+const DAY_COLUMN_WIDTH_PX_FOCUSED = 1450
+
+const SCHEDULE_CELL_MIN_HEIGHT = 104
+const SCHEDULE_CELL_MIN_HEIGHT_FOCUSED = 180
 
 function formatDateJP(dateStr: string) {
   const d = new Date(dateStr)
@@ -218,6 +232,27 @@ function makeCellKey(machineId: string, shiftCategory: string, date: string) {
 function compactNumber(value: number | null) {
   if (value == null) return "-"
   return value.toLocaleString("ja-JP")
+}
+
+function formatDateTimeJP(value?: string | null) {
+  if (!value) return "-"
+  const d = new Date(value)
+
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(
+    d.getMinutes(),
+  ).padStart(2, "0")}`
+}
+
+function formatWorkMinutes(value?: number | null) {
+  if (value == null) return "-"
+
+  const hours = Math.floor(value / 60)
+  const minutes = value % 60
+
+  if (hours <= 0) return `${minutes}分`
+  if (minutes === 0) return `${hours}時間`
+
+  return `${hours}時間${minutes}分`
 }
 
 function formatColorCount(item: ScheduleBlockRow) {
@@ -293,7 +328,27 @@ export default function WeeklyScheduleBoard({
   const [selectedUnassignedBlockIds, setSelectedUnassignedBlockIds] = React.useState<Set<string>>(
     () => new Set(),
   )
+  const [selectedAssignedBlockIds, setSelectedAssignedBlockIds] = React.useState<Set<string>>(
+  () => new Set(),
+)
   const [draggingBlock, setDraggingBlock] = React.useState<ScheduleBlockRow | null>(null)
+  const [unassignedCollapsed, setUnassignedCollapsed] = React.useState(false)
+
+  const isMachineFocused = machineFilter !== "all"
+const scheduleCellGrid = isMachineFocused ? SCHEDULE_CELL_GRID_FOCUSED : SCHEDULE_CELL_GRID
+const scheduleTableMinWidth = isMachineFocused
+  ? SCHEDULE_TABLE_MIN_WIDTH_FOCUSED
+  : SCHEDULE_TABLE_MIN_WIDTH
+const machineColumnWidth = isMachineFocused
+  ? MACHINE_COLUMN_WIDTH_FOCUSED
+  : MACHINE_COLUMN_WIDTH
+const dayColumnWidthPx = isMachineFocused
+  ? DAY_COLUMN_WIDTH_PX_FOCUSED
+  : DAY_COLUMN_WIDTH_PX
+
+  const scheduleCellMinHeight = isMachineFocused
+  ? SCHEDULE_CELL_MIN_HEIGHT_FOCUSED
+  : SCHEDULE_CELL_MIN_HEIGHT
 
   const topScrollRef = React.useRef<HTMLDivElement | null>(null)
   const bodyScrollRef = React.useRef<HTMLDivElement | null>(null)
@@ -365,7 +420,25 @@ export default function WeeklyScheduleBoard({
     return data.unassignedBlocks.filter((item) => selectedIds.has(item.block_id))
   }, [data.unassignedBlocks, selectedUnassignedBlockIds])
 
-  const selectedUnassignedCount = selectedUnassignedBlocks.length
+  const selectedUnassignedCount = selectedUnassignedBlocks.length 
+
+  const selectedAssignedBlocks = React.useMemo(() => {
+  if (selectedAssignedBlockIds.size === 0) return []
+
+  const blocks: ScheduleBlockRow[] = []
+
+  for (const cell of Object.values(data.cells)) {
+    for (const block of cell.blocks) {
+      if (selectedAssignedBlockIds.has(block.block_id)) {
+        blocks.push(block)
+      }
+    }
+  }
+
+  return blocks
+}, [data.cells, selectedAssignedBlockIds])
+
+const selectedAssignedCount = selectedAssignedBlocks.length
 
   React.useEffect(() => {
     setSelectedUnassignedBlockIds((current) => {
@@ -393,6 +466,24 @@ export default function WeeklyScheduleBoard({
     })
   }
 
+  function toggleAssignedSelection(block: ScheduleBlockRow) {
+  setSelectedAssignedBlockIds((current) => {
+    const next = new Set(current)
+
+    if (next.has(block.block_id)) {
+      next.delete(block.block_id)
+    } else {
+      next.add(block.block_id)
+    }
+
+    return next
+  })
+}
+
+function clearAssignedSelection() {
+  setSelectedAssignedBlockIds(new Set())
+}
+
   function clearUnassignedSelection() {
     setSelectedUnassignedBlockIds(new Set())
   }
@@ -417,7 +508,7 @@ export default function WeeklyScheduleBoard({
     lastAutoScrolledWeekKey.current = weekKey
 
     requestAnimationFrame(() => {
-      const scrollLeft = todayIndex * DAY_COLUMN_WIDTH_PX
+      const scrollLeft = todayIndex * dayColumnWidthPx
 
       if (topScrollRef.current) {
         topScrollRef.current.scrollLeft = scrollLeft
@@ -427,7 +518,7 @@ export default function WeeklyScheduleBoard({
         bodyScrollRef.current.scrollLeft = scrollLeft
       }
     })
-  }, [data.weekDays, today])
+  }, [data.weekDays, today, dayColumnWidthPx])
 
   const goWeek = (direction: -1 | 1) => {
     const base = new Date(baseDate)
@@ -536,57 +627,125 @@ export default function WeeklyScheduleBoard({
     }
   }
 
-  async function handleMoveBlockOrder(block: ScheduleBlockRow, direction: "up" | "down") {
-    if (!block.machine_id || !block.scheduled_date || !block.shift_category) return
+  async function handleWorkTimeAction(
+  block: ScheduleBlockRow,
+  action: "start" | "stop" | "clear",
+) {
+  const previousData = data
 
-    const key = makeCellKey(block.machine_id, block.shift_category, block.scheduled_date)
-    const currentCell = data.cells[key]
-    if (!currentCell) return
+  try {
+    setLoading(true)
+    setError(null)
 
-    const sortedBlocks = [...currentCell.blocks].sort((a, b) => {
-      const seqA = a.sequence_no ?? 9999
-      const seqB = b.sequence_no ?? 9999
-      if (seqA !== seqB) return seqA - seqB
-      return a.unit_name.localeCompare(b.unit_name, "ja")
+    const res = await fetch(`/api/schedule/block/${block.block_id}/work-time`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ action }),
     })
 
-    const currentIndex = sortedBlocks.findIndex((b) => b.block_id === block.block_id)
-    if (currentIndex < 0) return
+    const body = await res.json().catch(() => ({}))
 
-    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1
-    if (targetIndex < 0 || targetIndex >= sortedBlocks.length) return
+    if (!res.ok) {
+  throw new Error(body.error ?? "作業時間の保存に失敗しました")
+}
 
-    const currentBlock = sortedBlocks[currentIndex]
-    const targetBlock = sortedBlocks[targetIndex]
-    const currentSeq = currentBlock.sequence_no ?? currentIndex + 1
-    const targetSeq = targetBlock.sequence_no ?? targetIndex + 1
-    const previousData = data
+if (action === "start" || action === "stop") {
+  setSelectedBlock(null)
+  await refreshDataSilently(baseDate)
+  return
+}
 
-    setData((current) =>
-      swapBlockSequenceInCalendarData(current, currentBlock, targetBlock, currentSeq, targetSeq),
-    )
+await refreshDataSilently(baseDate)
 
-    const [resA, resB] = await Promise.all([
-      fetch(`/api/schedule/block/${currentBlock.block_id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sequence_no: targetSeq }),
-      }),
-      fetch(`/api/schedule/block/${targetBlock.block_id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sequence_no: currentSeq }),
-      }),
-    ])
-
-    if (!resA.ok || !resB.ok) {
-      setData(previousData)
-      alert("順番の保存に失敗しました。")
-      return
-    }
-
-    await refreshDataSilently(baseDate)
+if (selectedBlock?.block_id === block.block_id) {
+  setSelectedBlock((current) =>
+    current
+      ? {
+          ...current,
+          actual_start_at: body.data?.actual_start_at ?? null,
+          actual_end_at: body.data?.actual_end_at ?? null,
+          actual_work_minutes: body.data?.actual_work_minutes ?? null,
+          printing_completed:
+            body.data?.printing_completed ?? current.printing_completed,
+          unit_status: body.data?.unit_status ?? current.unit_status,
+        }
+      : current,
+  )
+}
+  } catch (e) {
+    setData(previousData)
+    setError(e instanceof Error ? e.message : "作業時間の保存に失敗しました")
+  } finally {
+    setLoading(false)
   }
+}
+
+  async function handleMoveBlockOrder(block: ScheduleBlockRow, direction: "up" | "down") {
+  if (!block.machine_id || !block.scheduled_date || !block.shift_category) return
+
+  const key = makeCellKey(block.machine_id, block.shift_category, block.scheduled_date)
+  const currentCell = data.cells[key]
+  if (!currentCell) return
+
+  const sortedBlocks = [...currentCell.blocks].sort((a, b) => {
+    const seqA = a.sequence_no ?? 9999
+    const seqB = b.sequence_no ?? 9999
+
+    if (seqA !== seqB) return seqA - seqB
+
+    // sequence_no が重複・null の場合の保険
+    return a.block_id.localeCompare(b.block_id)
+  })
+
+  const currentIndex = sortedBlocks.findIndex((b) => b.block_id === block.block_id)
+  if (currentIndex < 0) return
+
+  const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1
+  if (targetIndex < 0 || targetIndex >= sortedBlocks.length) return
+
+  const reorderedBlocks = [...sortedBlocks]
+  const [moved] = reorderedBlocks.splice(currentIndex, 1)
+  reorderedBlocks.splice(targetIndex, 0, moved)
+
+  const resequencedBlocks = reorderedBlocks.map((item, index) => ({
+    ...item,
+    sequence_no: index + 1,
+  }))
+
+  const previousData = data
+
+  setData((current) =>
+    resequenceCellBlocksInCalendarData(
+      current,
+      block.machine_id!,
+      block.shift_category as "day" | "night",
+      block.scheduled_date!,
+      resequencedBlocks,
+    ),
+  )
+
+  const results = await Promise.all(
+    resequencedBlocks.map((item) =>
+      fetch(`/api/schedule/block/${item.block_id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sequence_no: item.sequence_no,
+        }),
+      }),
+    ),
+  )
+
+  if (results.some((res) => !res.ok)) {
+    setData(previousData)
+    alert("順番の保存に失敗しました。")
+    return
+  }
+
+  await refreshDataSilently(baseDate)
+}
 
   async function updateBlockAssignment({
     block,
@@ -728,9 +887,13 @@ export default function WeeklyScheduleBoard({
 
     if (dropData.type === "schedule-cell") {
       const blocksToMove =
-        dragData.source === "unassigned" && selectedUnassignedBlockIds.has(dragData.block.block_id)
-          ? selectedUnassignedBlocks
-          : [dragData.block]
+  dragData.source === "unassigned" &&
+  selectedUnassignedBlockIds.has(dragData.block.block_id)
+    ? selectedUnassignedBlocks
+    : dragData.source === "assigned" &&
+        selectedAssignedBlockIds.has(dragData.block.block_id)
+      ? selectedAssignedBlocks
+      : [dragData.block]
 
       const startSequenceNo = getNextSequenceNo(
         data,
@@ -750,6 +913,7 @@ export default function WeeklyScheduleBoard({
         }, current),
       )
       clearUnassignedSelection()
+      clearAssignedSelection()
 
       const results = await Promise.all(
         blocksToMove.map((block, index) =>
@@ -827,82 +991,324 @@ export default function WeeklyScheduleBoard({
     await refreshDataSilently(baseDate)
   }
 
+  async function handleUnassignCellBlocks(blocks: ScheduleBlockRow[]) {
+  if (blocks.length === 0) return
+
+  const label = `${blocks[0]?.machine_name ?? ""} / ${blocks[0]?.scheduled_date ?? ""} / ${blocks[0]?.shift_label ?? ""}`
+
+  if (!confirm(`このセルの案件 ${blocks.length}件を未割当に戻しますか？\n\n${label}`)) {
+    return
+  }
+
+  const previousData = data
+  const blockIds = blocks.map((block) => block.block_id)
+
+  try {
+    setLoading(true)
+    setError(null)
+
+    let nextData = data
+    for (const block of blocks) {
+      nextData = moveBlockInCalendarData(nextData, block, {
+        machineId: null,
+        date: null,
+        shiftCategory: null,
+      })
+    }
+    setData(nextData)
+
+    const res = await fetch("/api/schedule/blocks/unassign", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ blockIds }),
+    })
+
+    const body = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      throw new Error(body.error ?? "一括未割当処理に失敗しました")
+    }
+
+    await refreshDataSilently(baseDate)
+  } catch (e) {
+    setData(previousData)
+    setError(e instanceof Error ? e.message : "一括未割当処理に失敗しました")
+  } finally {
+    setLoading(false)
+  }
+}
+
+async function handleUnassignSelectedAssignedBlocks(blocks: ScheduleBlockRow[]) {
+  const selectedBlocks = blocks.filter((block) =>
+    selectedAssignedBlockIds.has(block.block_id),
+  )
+
+  if (selectedBlocks.length === 0) return
+
+  if (!confirm(`選択中の${selectedBlocks.length}件を未割当に戻しますか？`)) {
+    return
+  }
+
+  const previousData = data
+  const blockIds = selectedBlocks.map((block) => block.block_id)
+
+  try {
+    setLoading(true)
+    setError(null)
+
+    let nextData = data
+
+    for (const block of selectedBlocks) {
+      nextData = moveBlockInCalendarData(nextData, block, {
+        machineId: null,
+        date: null,
+        shiftCategory: null,
+      })
+    }
+
+    setData(nextData)
+
+    const res = await fetch("/api/schedule/blocks/unassign", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ blockIds }),
+    })
+
+    const body = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      throw new Error(body.error ?? "選択案件の未割当処理に失敗しました")
+    }
+
+    setSelectedAssignedBlockIds(new Set())
+    await refreshDataSilently(baseDate)
+  } catch (e) {
+    setData(previousData)
+    setError(e instanceof Error ? e.message : "選択案件の未割当処理に失敗しました")
+  } finally {
+    setLoading(false)
+  }
+}
+
+  async function handleCancelUnassignedBlock(block: ScheduleBlockRow) {
+  const label = `${block.order_number ?? ""} / ${block.product_name ?? block.unit_name ?? ""}`
+
+  if (!confirm(`この未割当案件をリストから削除しますか？\n\n${label}`)) {
+    return
+  }
+
+  try {
+    setLoading(true)
+    setError(null)
+
+    const res = await fetch(`/api/schedule/block/${block.block_id}/cancel`, {
+      method: "PATCH",
+    })
+
+    const body = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      throw new Error(body.error ?? "未割当案件の削除に失敗しました")
+    }
+
+    setSelectedUnassignedBlockIds((prev) => {
+      const next = new Set(prev)
+      next.delete(block.block_id)
+      return next
+    })
+
+    await loadData(baseDate)
+  } catch (e) {
+    setError(e instanceof Error ? e.message : "未割当案件の削除に失敗しました")
+  } finally {
+    setLoading(false)
+  }
+}
+
+async function handleCancelSelectedUnassignedBlocks() {
+  const blockIds = Array.from(selectedUnassignedBlockIds)
+
+  if (blockIds.length === 0) return
+
+  if (!confirm(`選択中の${blockIds.length}件を未割当リストから削除しますか？`)) {
+    return
+  }
+
+  try {
+    setLoading(true)
+    setError(null)
+
+    const res = await fetch("/api/schedule/blocks/cancel", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ blockIds }),
+    })
+
+    const body = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      throw new Error(body.error ?? "未割当案件の一括削除に失敗しました")
+    }
+
+    setSelectedUnassignedBlockIds(new Set())
+    await loadData(baseDate)
+  } catch (e) {
+    setError(e instanceof Error ? e.message : "未割当案件の一括削除に失敗しました")
+  } finally {
+    setLoading(false)
+  }
+}
+
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="grid h-[calc(100vh-120px)] min-h-[760px] grid-cols-[420px_1fr] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
+      <div
+  className={`grid h-[calc(100vh-80px)] min-h-[820px] gap-0 overflow-hidden rounded-2xl border bg-white shadow-sm ${
+    unassignedCollapsed ? "grid-cols-[48px_1fr]" : "grid-cols-[420px_1fr]"
+  }`}
+>
         <DroppableUnassignedArea active={!!draggingBlock && !!draggingBlock.machine_id}>
-          <aside className="flex h-full min-h-0 flex-col overflow-hidden border-r bg-white">
-            <div className="shrink-0 border-b p-4">
-              <h2 className="text-lg font-bold tracking-tight">未割当案件</h2>
+  {unassignedCollapsed ? (
+    <aside className="flex h-full min-h-0 flex-col items-center border-r bg-slate-50 px-1 py-3">
+      <button
+        type="button"
+        onClick={() => setUnassignedCollapsed(false)}
+        className="rounded-md border bg-white px-2 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-100"
+        title="未割当案件を表示"
+      >
+        開
+      </button>
 
-              <div className="relative mt-3">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="検索…"
-                  className="pl-9"
-                />
-              </div>
+      <div className="mt-4 text-[11px] font-bold text-slate-500 [writing-mode:vertical-rl]">
+        未割当
+      </div>
 
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-                <span className="text-muted-foreground">フィルタ:</span>
+      {filteredUnassigned.length > 0 ? (
+        <div className="mt-4 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold text-white">
+          {filteredUnassigned.length}
+        </div>
+      ) : null}
+    </aside>
+  ) : (
+    <aside className="flex h-full min-h-0 flex-col overflow-hidden border-r bg-white">
+      <div className="shrink-0 border-b p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-bold tracking-tight">未割当案件</h2>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setUnassignedCollapsed(true)}
+          >
+            閉じる
+          </Button>
+        </div>
+
+        <div className="relative mt-3">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="検索…"
+            className="pl-9"
+          />
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-muted-foreground">フィルタ:</span>
+          <Button
+            variant={showUnassignedOnly ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setShowUnassignedOnly((v) => !v)}
+          >
+            未割当のみ
+          </Button>
+        </div>
+
+        {selectedUnassignedCount > 0 ? (
+          <div className="mt-3 rounded-md border border-blue-300 bg-blue-50 p-2 text-xs text-blue-900">
+            <div className="flex items-center justify-between gap-2">
+              <div className="font-bold">{selectedUnassignedCount}件選択中</div>
+
+              <div className="flex items-center gap-2">
                 <Button
-                  variant={showUnassignedOnly ? "secondary" : "outline"}
+                  type="button"
+                  variant="outline"
                   size="sm"
-                  onClick={() => setShowUnassignedOnly((v) => !v)}
+                  onClick={clearUnassignedSelection}
                 >
-                  未割当のみ
+                  選択解除
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => void handleCancelSelectedUnassignedBlocks()}
+                >
+                  選択分を削除
                 </Button>
               </div>
-
-              {selectedUnassignedCount > 0 ? (
-                <div className="mt-3 rounded-md border border-blue-300 bg-blue-50 p-2 text-xs text-blue-900">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="font-bold">{selectedUnassignedCount}件選択中</div>
-                    <Button type="button" variant="outline" size="sm" onClick={clearUnassignedSelection}>
-                      選択解除
-                    </Button>
-                  </div>
-                  <div
-                    className="mt-1 truncate"
-                    title={selectedUnassignedBlocks.map((item) => item.product_name ?? item.unit_name).join(" / ")}
-                  >
-                    {selectedUnassignedBlocks[0]?.unit_name} / {selectedUnassignedBlocks[0]?.product_name ?? "-"}
-                    {selectedUnassignedCount > 1 ? ` ほか${selectedUnassignedCount - 1}件` : ""}
-                  </div>
-                  <div className="mt-1 text-[11px] text-blue-800">
-                    この状態で右の予定セルをクリックすると、選択した案件をまとめて割当できます。
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
-                  未割当案件を複数選択、またはドラッグして、右の予定セルに割当できます。
-                </div>
-              )}
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-scroll overscroll-contain">
-              {filteredUnassigned.length === 0 ? (
-                <div className="p-6 text-sm text-muted-foreground">未割当案件はありません。</div>
-              ) : (
-                <div className="divide-y">
-                  {filteredUnassigned.map((item) => (
-                    <DraggableBlock
-                      key={item.block_id}
-                      block={item}
-                      source="unassigned"
-                      selected={selectedUnassignedBlockIds.has(item.block_id)}
-                      onSelect={() => toggleUnassignedSelection(item)}
-                    >
-                      <UnassignedBlockCard item={item} />
-                    </DraggableBlock>
-                  ))}
-                </div>
-              )}
+            <div
+              className="mt-1 truncate"
+              title={selectedUnassignedBlocks
+                .map((item) => item.product_name ?? item.unit_name)
+                .join(" / ")}
+            >
+              {selectedUnassignedBlocks[0]?.unit_name} /{" "}
+              {selectedUnassignedBlocks[0]?.product_name ?? "-"}
+              {selectedUnassignedCount > 1
+                ? ` ほか${selectedUnassignedCount - 1}件`
+                : ""}
             </div>
-          </aside>
-        </DroppableUnassignedArea>
+
+            <div className="mt-1 text-[11px] text-blue-800">
+              この状態で右の予定セルをクリックすると、選択した案件をまとめて割当できます。
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-2 text-xs text-slate-600">
+            未割当案件を複数選択、またはドラッグして、右の予定セルに割当できます。
+          </div>
+        )}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-scroll overscroll-contain">
+        {filteredUnassigned.length === 0 ? (
+          <div className="p-6 text-sm text-muted-foreground">
+            未割当案件はありません。
+          </div>
+        ) : (
+          <div className="divide-y">
+            {filteredUnassigned.map((item) => (
+              <DraggableBlock
+                key={item.block_id}
+                block={item}
+                source="unassigned"
+                selected={selectedUnassignedBlockIds.has(item.block_id)}
+                onSelect={() => toggleUnassignedSelection(item)}
+              >
+                <UnassignedBlockCard
+                  item={item}
+                  selected={selectedUnassignedBlockIds.has(item.block_id)}
+                  onCancel={() => handleCancelUnassignedBlock(item)}
+                />
+              </DraggableBlock>
+            ))}
+          </div>
+        )}
+      </div>
+    </aside>
+  )}
+</DroppableUnassignedArea>
 
         <section className="flex min-w-0 flex-col overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b p-3">
@@ -954,7 +1360,7 @@ export default function WeeklyScheduleBoard({
             onScroll={() => syncScroll("top")}
             className="h-5 overflow-x-auto overflow-y-hidden border-b bg-slate-50"
           >
-            <div className={`h-1 ${SCHEDULE_TABLE_MIN_WIDTH}`} />
+            <div className={`h-1 ${scheduleTableMinWidth}`} />
           </div>
 
           <div
@@ -962,21 +1368,22 @@ export default function WeeklyScheduleBoard({
             onScroll={() => syncScroll("body")}
             className="relative flex-1 overflow-auto bg-white"
           >
-            <table className={`${SCHEDULE_TABLE_MIN_WIDTH} border-separate border-spacing-0 text-[11px]`}>
+            <table className={`${scheduleTableMinWidth} border-separate border-spacing-0 ${isMachineFocused ? "text-[12px]" : "text-[11px]"}`}>
               <thead className="bg-white">
                 <tr>
                   <th
-                    className={`sticky left-0 top-0 z-30 h-16 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-[#f7f7f7] px-3 py-3 text-left text-sm font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.10)]`}
+                    className={`sticky left-0 top-0 z-30 h-16 ${machineColumnWidth} border border-slate-300 bg-[#f7f7f7] px-3 py-3 text-left text-sm font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.10)]`}
                   >
                     印刷機
                   </th>
                   {data.weekDays.map((day) => (
   <th
     key={day.date}
-    className="sticky top-0 z-20 h-16 min-w-[1150px] border border-slate-300 px-1 py-2 text-center font-bold shadow-[inset_0_-1px_0_#cbd5e1,inset_-1px_0_0_#cbd5e1]"
-    style={{
-      backgroundColor: getWeekdayHeaderColor(day.weekday),
-    }}
+    className="sticky top-0 z-20 h-16 border border-slate-300 px-1 py-2 text-center font-bold shadow-[inset_0_-1px_0_#cbd5e1,inset_-1px_0_0_#cbd5e1]"
+style={{
+  minWidth: `${dayColumnWidthPx}px`,
+  backgroundColor: getWeekdayHeaderColor(day.weekday),
+}}
   >
     <div>{day.label}（{day.weekday}）</div>
   </th>
@@ -988,14 +1395,15 @@ export default function WeeklyScheduleBoard({
                 {machineRows.map((row) => (
                   <tr key={`${row.machine_id}-${row.shift_category}`}>
                     <td
-  className={`sticky left-0 z-10 ${MACHINE_COLUMN_WIDTH} border border-slate-300 bg-white px-2 py-2 align-top font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.08)]`}
+  className={`sticky left-0 z-10 ${machineColumnWidth} border border-slate-300 bg-white px-2 py-2 align-top font-bold whitespace-nowrap shadow-[inset_-1px_0_0_#cbd5e1,inset_0_-1px_0_#cbd5e1,4px_0_6px_rgba(15,23,42,0.08)]`}
+  style={{ height: scheduleCellMinHeight }}
 >
-  <div className="text-[13px] font-bold leading-tight">
-    {row.machine_name}
-  </div>
-  <div className="mt-1 text-[12px] text-muted-foreground">
-    {row.shift_label}
-  </div>
+  <div className={`${isMachineFocused ? "text-[16px]" : "text-[13px]"} font-bold leading-tight`}>
+  {row.machine_name}
+</div>
+<div className={`mt-1 ${isMachineFocused ? "text-[13px]" : "text-[12px]"} text-muted-foreground`}>
+  {row.shift_label}
+</div>
 </td>
 
                     {data.weekDays.map((day) => {
@@ -1014,6 +1422,7 @@ export default function WeeklyScheduleBoard({
                             date={day.date}
                             shiftCategory={row.shift_category}
                             active={selectedUnassignedCount > 0 || !!draggingBlock}
+                            minHeight={scheduleCellMinHeight}
                             onClick={() =>
                               handleAssignBlockToCell({
                                 block: null,
@@ -1027,23 +1436,100 @@ export default function WeeklyScheduleBoard({
                               <div className="pt-6 text-center text-xs text-muted-foreground">読み込み中…</div>
                             ) : cell?.blocks.length ? (
                               <>
-                                <ScheduleCellHeader />
-                                <div className="space-y-0">
-                                  {cell.blocks.map((block, index) => (
-                                    <DraggableBlock key={block.block_id} block={block} source="assigned">
-                                      <ScheduleCellItem
-                                        block={block}
-                                        canMoveUp={index > 0}
-                                        canMoveDown={index < cell.blocks.length - 1}
-                                        onMoveUp={() => handleMoveBlockOrder(block, "up")}
-                                        onMoveDown={() => handleMoveBlockOrder(block, "down")}
-                                        onClick={() => setSelectedBlock(block)}
-                                        onToggleProgress={(field, checked) => handleToggleProgress(block, field, checked)}
-                                        onSaveNote={(note) => handleSaveNote(block, note)}
-                                      />
-                                    </DraggableBlock>
-                                  ))}
-                                </div>
+                                <div className="flex items-center justify-between border-b border-slate-300 bg-slate-50 px-2 py-1">
+  <div className="text-[11px] font-bold text-slate-700">
+    {cell.blocks.length}件
+    {cell.blocks.some((block) => selectedAssignedBlockIds.has(block.block_id)) ? (
+      <span className="ml-2 text-blue-700">
+        選択中 {
+          cell.blocks.filter((block) => selectedAssignedBlockIds.has(block.block_id)).length
+        }件
+      </span>
+    ) : null}
+  </div>
+
+  <div className="flex items-center gap-1">
+    {cell.blocks.some((block) => selectedAssignedBlockIds.has(block.block_id)) ? (
+      <>
+        <button
+          type="button"
+          className="rounded border border-blue-300 bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 hover:bg-blue-100"
+          onClick={(e) => {
+            e.stopPropagation()
+            void handleUnassignSelectedAssignedBlocks(cell.blocks)
+          }}
+        >
+          選択分を未割当へ
+        </button>
+
+        <button
+          type="button"
+          className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-600 hover:bg-slate-100"
+          onClick={(e) => {
+            e.stopPropagation()
+            clearAssignedSelection()
+          }}
+        >
+          選択解除
+        </button>
+      </>
+    ) : null}
+
+    <button
+      type="button"
+      className="rounded border border-slate-300 bg-white px-2 py-0.5 text-[11px] text-slate-700 hover:bg-slate-100"
+      onClick={(e) => {
+        e.stopPropagation()
+        void handleUnassignCellBlocks(cell.blocks)
+      }}
+    >
+      このセルを未割当へ
+    </button>
+  </div>
+</div>
+
+<ScheduleCellHeader
+  gridClass={scheduleCellGrid}
+  focused={isMachineFocused}
+/>
+
+<div className="space-y-0">
+  {[...cell.blocks]
+    .sort((a, b) => {
+      const seqA = a.sequence_no ?? 9999
+      const seqB = b.sequence_no ?? 9999
+
+      if (seqA !== seqB) return seqA - seqB
+
+      return a.block_id.localeCompare(b.block_id)
+    })
+    .map((block, index, sortedBlocks) => (
+      <DraggableBlock key={block.block_id} block={block} source="assigned">
+        <ScheduleCellItem
+          block={block}
+          gridClass={scheduleCellGrid}
+          focused={isMachineFocused}
+          selected={selectedAssignedBlockIds.has(block.block_id)}
+          canMoveUp={index > 0}
+          canMoveDown={index < sortedBlocks.length - 1}
+          onMoveUp={() => handleMoveBlockOrder(block, "up")}
+          onMoveDown={() => handleMoveBlockOrder(block, "down")}
+          onClick={(event) => {
+            if (event.ctrlKey || event.metaKey) {
+              toggleAssignedSelection(block)
+              return
+            }
+
+            setSelectedBlock(block)
+          }}
+          onToggleProgress={(field, checked) =>
+            handleToggleProgress(block, field, checked)
+          }
+          onSaveNote={(note) => handleSaveNote(block, note)}
+        />
+      </DraggableBlock>
+    ))}
+</div>
                               </>
                             ) : (
                               <div className="pt-6 text-center text-xs text-muted-foreground">-</div>
@@ -1060,57 +1546,210 @@ export default function WeeklyScheduleBoard({
         </section>
 
         <Dialog open={!!selectedBlock} onOpenChange={(open) => !open && setSelectedBlock(null)}>
-          <DialogContent className="z-[100] max-w-3xl">
+          <DialogContent className="z-[100] max-h-[90vh] max-w-3xl overflow-y-auto">
             <DialogHeader>
               <DialogTitle>案件詳細</DialogTitle>
             </DialogHeader>
 
             {selectedBlock ? (
-              <>
-                <div className="rounded-xl border bg-slate-50 p-4">
-                  <div className="grid gap-3 md:grid-cols-[140px_1fr]">
-                    <Info label="受注番号" value={getSafeOrderNumber(selectedBlock)} compact />
-                    <Info label="品名" value={selectedBlock.product_name} compact strong />
-                  </div>
-                </div>
+  <>
+    {/* 重要情報 */}
+<div className="rounded-xl border bg-slate-50 p-3">
+  <div className="grid gap-2 md:grid-cols-[120px_1fr]">
+    <Info
+      label="受注番号"
+      value={getSafeOrderNumber(selectedBlock)}
+      compact
+    />
 
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <Info label="得意先" value={selectedBlock.customer_name} />
-                  <Info label="印刷単位" value={formatPrintUnitSummary(selectedBlock)} />
-                  <Info label="版型" value={selectedBlock.plate_size} />
-                  <Info label="色数" value={`${selectedBlock.color_front ?? "-"}/${selectedBlock.color_back ?? "-"}`} />
-                  <Info label="色指定・備考" value={selectedBlock.color_note} />
-                  <Info label="通紙" value={selectedBlock.print_count?.toLocaleString("ja-JP")} />
-                  <Info label="特記" value={selectedBlock.block_note} />
-                  <Info label="印刷機" value={selectedBlock.machine_name} />
-                  <Info label="日付" value={selectedBlock.scheduled_date} />
-                  <Info label="順番" value={selectedBlock.sequence_no ? String(selectedBlock.sequence_no) : null} />
-                  <Info label="状態" value={getStatusLabel(selectedBlock.block_status)} />
-                </div>
+    <Info
+      label="品名"
+      value={selectedBlock.product_name}
+      compact
+      strong
+    />
+  </div>
+</div>
 
-                <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  この画面は、割当済み案件の内容確認と「未割当に戻す」操作用です。
-                </div>
+    {/* 作業記録 */}
+    <div className="mt-4 rounded-xl border bg-white p-4">
+  <div className="mb-3 text-sm font-bold">作業記録</div>
 
-                <div className="mt-6 flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setSelectedBlock(null)}>
-                    閉じる
-                  </Button>
+  {/* ボタンを大きく表示 */}
+  <div className="grid grid-cols-2 gap-3">
+    <Button
+      type="button"
+      variant="secondary"
+      className="h-14 bg-green-600 text-base font-bold text-white hover:bg-green-700"
+      onClick={() => void handleWorkTimeAction(selectedBlock, "start")}
+      disabled={!!selectedBlock.actual_start_at && !selectedBlock.actual_end_at}
+    >
+      作業開始
+    </Button>
 
-                  {selectedBlock.machine_id || selectedBlock.scheduled_date ? (
-                    <Button type="button" variant="destructive" onClick={() => handleUnassignBlock(selectedBlock)}>
-                      未割当に戻す
-                    </Button>
-                  ) : null}
-                </div>
-              </>
-            ) : null}
+    <Button
+      type="button"
+      variant="secondary"
+      className="h-14 bg-red-600 text-base font-bold text-white hover:bg-red-700"
+      onClick={() => void handleWorkTimeAction(selectedBlock, "stop")}
+      disabled={!selectedBlock.actual_start_at || !!selectedBlock.actual_end_at}
+    >
+      作業終了
+    </Button>
+  </div>
+
+  {/* 時刻表示は小さく */}
+  <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+    <div className="rounded-md border bg-slate-50 px-2 py-1.5">
+      <div className="text-[10px] text-muted-foreground">開始時刻</div>
+      <div className="mt-0.5 font-medium">
+        {formatDateTimeJP(selectedBlock.actual_start_at)}
+      </div>
+    </div>
+
+    <div className="rounded-md border bg-slate-50 px-2 py-1.5">
+      <div className="text-[10px] text-muted-foreground">停止時刻</div>
+      <div className="mt-0.5 font-medium">
+        {formatDateTimeJP(selectedBlock.actual_end_at)}
+      </div>
+    </div>
+
+    <div className="rounded-md border bg-slate-50 px-2 py-1.5">
+      <div className="text-[10px] text-muted-foreground">作業時間</div>
+      <div className="mt-0.5 font-bold">
+        {formatWorkMinutes(selectedBlock.actual_work_minutes)}
+      </div>
+    </div>
+  </div>
+
+  <div className="mt-3 flex justify-end">
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={() => {
+        if (confirm("作業時間をクリアしますか？")) {
+          void handleWorkTimeAction(selectedBlock, "clear")
+        }
+      }}
+      disabled={!selectedBlock.actual_start_at && !selectedBlock.actual_end_at}
+    >
+      クリア
+    </Button>
+  </div>
+</div>
+
+    {/* 詳細情報：折りたたみ */}
+<details className="mt-4 rounded-xl border bg-white">
+  <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+    詳細情報を表示
+  </summary>
+
+  <div className="grid gap-3 border-t p-4 md:grid-cols-3">
+    <Info
+      label="得意先"
+      value={selectedBlock.customer_name}
+      compact
+    />
+
+    <Info
+      label="印刷単位"
+      value={formatPrintUnitSummary(selectedBlock)}
+      compact
+    />
+
+    <Info
+      label="版型"
+      value={selectedBlock.plate_size}
+      compact
+    />
+
+    <Info
+      label="色数"
+      value={`${selectedBlock.color_front ?? "-"}/${selectedBlock.color_back ?? "-"}`}
+      compact
+    />
+
+    <Info
+      label="色指定・備考"
+      value={selectedBlock.color_note}
+      compact
+    />
+
+    <Info
+      label="通紙"
+      value={selectedBlock.print_count?.toLocaleString("ja-JP")}
+      compact
+    />
+
+    <Info
+      label="特記"
+      value={selectedBlock.block_note}
+      compact
+    />
+
+    <Info
+      label="印刷機"
+      value={selectedBlock.machine_name}
+      compact
+    />
+
+    <Info
+      label="日付"
+      value={selectedBlock.scheduled_date}
+      compact
+    />
+
+    <Info
+      label="順番"
+      value={selectedBlock.sequence_no ? String(selectedBlock.sequence_no) : null}
+      compact
+    />
+
+    <Info
+      label="状態"
+      value={getStatusLabel(selectedBlock.block_status)}
+      compact
+    />
+  </div>
+</details>
+
+    <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+      この画面は、割当済み案件の内容確認、作業時間の記録、「未割当に戻す」操作用です。
+    </div>
+
+    <div className="mt-6 flex justify-end gap-2">
+      <Button type="button" variant="outline" onClick={() => setSelectedBlock(null)}>
+        閉じる
+      </Button>
+
+      {selectedBlock.machine_id || selectedBlock.scheduled_date ? (
+        <Button
+          type="button"
+          variant="destructive"
+          onClick={() => handleUnassignBlock(selectedBlock)}
+        >
+          未割当に戻す
+        </Button>
+      ) : null}
+    </div>
+  </>
+) : null}
           </DialogContent>
         </Dialog>
       </div>
 
       <DragOverlay>
-        {draggingBlock ? <DragOverlayCard block={draggingBlock} count={selectedUnassignedBlockIds.has(draggingBlock.block_id) ? selectedUnassignedCount : 1} /> : null}
+        {draggingBlock ? <DragOverlayCard
+  block={draggingBlock}
+  count={
+    selectedUnassignedBlockIds.has(draggingBlock.block_id)
+      ? selectedUnassignedCount
+      : selectedAssignedBlockIds.has(draggingBlock.block_id)
+        ? selectedAssignedCount
+        : 1
+  }
+/> : null}
       </DragOverlay>
     </DndContext>
   )
@@ -1190,6 +1829,34 @@ function swapBlockSequenceInCalendarData(
         return a.unit_name.localeCompare(b.unit_name, "ja")
       }),
     }
+  }
+
+  return {
+    ...current,
+    cells: nextCells,
+  }
+}
+
+function resequenceCellBlocksInCalendarData(
+  current: WeeklyCalendarData,
+  machineId: string,
+  shiftCategory: "day" | "night",
+  date: string,
+  resequencedBlocks: ScheduleBlockRow[],
+): WeeklyCalendarData {
+  const key = makeCellKey(machineId, shiftCategory, date)
+
+  const nextCells: Record<string, WeeklyCalendarCell> = {
+    ...current.cells,
+  }
+
+  if (!nextCells[key]) {
+    return current
+  }
+
+  nextCells[key] = {
+    ...nextCells[key],
+    blocks: resequencedBlocks,
   }
 
   return {
@@ -1285,9 +1952,19 @@ function moveBlockInCalendarData(
   }
 }
 
-export function ScheduleCellHeader() {
+export function ScheduleCellHeader({
+  gridClass = SCHEDULE_CELL_GRID,
+  focused = false,
+}: {
+  gridClass?: string
+  focused?: boolean
+}) {
   return (
-    <div className={`grid ${SCHEDULE_CELL_GRID} border-b border-slate-400 bg-slate-100 text-[10px] font-medium`}>
+    <div
+      className={`grid ${gridClass} border-b border-slate-400 bg-slate-100 ${
+        focused ? "text-[11px]" : "text-[10px]"
+      } font-medium`}
+    >
       <div className="border-r border-slate-300 px-1 py-0.5 text-center">順</div>
       <div className="border-r border-slate-300 px-1 py-0.5">受注</div>
       <div className="border-r border-slate-300 px-1 py-0.5">品名</div>
@@ -1317,67 +1994,147 @@ export function ScheduleCellItem({
   onClick,
   onToggleProgress,
   onSaveNote,
+  gridClass = SCHEDULE_CELL_GRID,
+  focused = false,
+  selected = false,
 }: {
   block: ScheduleBlockRow
   canMoveUp?: boolean
   canMoveDown?: boolean
   onMoveUp?: () => void
   onMoveDown?: () => void
-  onClick?: () => void
+  onClick?: (event: React.MouseEvent<HTMLDivElement>) => void
   onToggleProgress?: (field: ProgressField, checked: boolean) => void
   onSaveNote?: (note: string) => void
+  gridClass?: string
+  focused?: boolean
+  selected?: boolean
 }) {
+  const completed = !!block.printing_completed
+
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={(e) => {
         e.stopPropagation()
-        onClick?.()
+        onClick?.(e)
       }}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.stopPropagation()
-          onClick?.()
-        }
-      }}
-      className="block w-full cursor-pointer border-b border-slate-300 bg-white text-left text-[11px] hover:bg-slate-50"
+  if (e.key === "Enter" || e.key === " ") {
+    e.stopPropagation()
+  }
+}}
+      className={`block w-full cursor-pointer border-b border-slate-300 text-left text-[11px] ${
+  completed
+    ? "bg-[#b7b7b7]"
+    : selected
+      ? "bg-blue-200 ring-2 ring-inset ring-blue-600"
+      : "bg-white hover:bg-slate-50"
+}`}
     >
-      <div className={`grid min-h-[28px] ${SCHEDULE_CELL_GRID} items-stretch`}>
+      <div
+        className={`grid ${gridClass} border-b border-slate-300 ${
+  focused ? "text-[12px]" : "text-[11px]"
+} ${
+  completed
+    ? "bg-[#b7b7b7] text-slate-700 [&>*]:bg-[#b7b7b7]"
+    : selected
+      ? "bg-blue-200 text-slate-950 [&>*]:bg-blue-200"
+      : "bg-white text-slate-900"
+}`}
+      >
         <OrderMoveCell
           canMoveUp={!!canMoveUp}
           canMoveDown={!!canMoveDown}
           onMoveUp={onMoveUp}
           onMoveDown={onMoveDown}
         />
+
         <Cell className="font-medium">{block.order_number ?? "-"}</Cell>
-        <Cell title={block.product_name ?? ""} className="truncate">{block.product_name ?? "-"}</Cell>
-        <CheckCell checked={!!block.dtp_completed} onToggle={() => onToggleProgress?.("dtp_completed", !block.dtp_completed)} />
-        <CheckCell checked={!!block.paper_stacked} onToggle={() => onToggleProgress?.("paper_stacked", !block.paper_stacked)} />
-        <CheckCell checked={!!block.plate_completed} onToggle={() => onToggleProgress?.("plate_completed", !block.plate_completed)} />
-        <CheckCell checked={!!block.pp_processed} onToggle={() => onToggleProgress?.("pp_processed", !block.pp_processed)} />
-        <Cell className="truncate" title={block.unit_name}>{block.unit_name}</Cell>
+
+        <Cell title={block.product_name ?? ""} className="truncate">
+          {block.product_name ?? "-"}
+        </Cell>
+
+        <CheckCell
+          checked={!!block.dtp_completed}
+          completed={completed}
+          onToggle={() =>
+            onToggleProgress?.("dtp_completed", !block.dtp_completed)
+          }
+        />
+
+        <CheckCell
+          checked={!!block.paper_stacked}
+          completed={completed}
+          onToggle={() =>
+            onToggleProgress?.("paper_stacked", !block.paper_stacked)
+          }
+        />
+
+        <CheckCell
+          checked={!!block.plate_completed}
+          completed={completed}
+          onToggle={() =>
+            onToggleProgress?.("plate_completed", !block.plate_completed)
+          }
+        />
+
+        <CheckCell
+          checked={!!block.pp_processed}
+          completed={completed}
+          onToggle={() =>
+            onToggleProgress?.("pp_processed", !block.pp_processed)
+          }
+        />
+
+        <Cell className="truncate" title={block.unit_name}>
+          {block.unit_name}
+        </Cell>
+
         <Cell>{block.plate_size ?? "-"}</Cell>
+
         <Cell>{formatColorCount(block)}</Cell>
 
-<Cell title={formatSpecialColor(block)} className="truncate">
-  {formatSpecialColor(block)}
-</Cell>
+        <Cell title={formatSpecialColor(block)} className="truncate">
+          {formatSpecialColor(block)}
+        </Cell>
 
-<CheckCell
-  checked={!!block.has_special_color}
-  onToggle={() =>
-    onToggleProgress?.("has_special_color", !block.has_special_color)
+        <CheckCell
+          checked={!!block.has_special_color}
+          completed={completed}
+          onToggle={() =>
+            onToggleProgress?.("has_special_color", !block.has_special_color)
+          }
+        />
+
+        <Cell className="justify-end text-right">
+          {compactNumber(block.print_count)}
+        </Cell>
+
+        <NoteCell value={block.block_note} onSave={(value) => onSaveNote?.(value)} />
+
+        <Cell
+  className={
+    completed
+      ? "bg-[#b7b7b7] text-slate-600"
+      : "bg-slate-50 text-slate-700"
   }
-/>
-
-<Cell className="justify-end text-right">
-  {compactNumber(block.print_count)}
+>
+  {formatWorkMinutes(block.actual_work_minutes)}
 </Cell>
 
-<NoteCell value={block.block_note} onSave={(value) => onSaveNote?.(value)} />
-        <Cell className="bg-slate-50 text-slate-400">-</Cell>
-        <CheckCell checked={!!block.printing_completed} onToggle={() => onToggleProgress?.("printing_completed", !block.printing_completed)} />
+        <CheckCell
+          checked={!!block.printing_completed}
+          completed={completed}
+          onToggle={() =>
+            onToggleProgress?.(
+              "printing_completed",
+              !block.printing_completed,
+            )
+          }
+        />
       </div>
     </div>
   )
@@ -1482,6 +2239,7 @@ function DroppableScheduleCell({
   date,
   shiftCategory,
   active,
+  minHeight = SCHEDULE_CELL_MIN_HEIGHT,
   onClick,
   children,
 }: {
@@ -1506,11 +2264,20 @@ function DroppableScheduleCell({
     <div
       ref={setNodeRef}
       onClick={onClick}
-      className={`min-h-[104px] bg-white ${active ? "cursor-copy hover:bg-blue-50" : ""} ${
-        isOver ? "bg-blue-100 ring-2 ring-blue-400" : ""
-      }`}
+      className={`relative ${
+  active ? "cursor-copy" : ""
+}`}
+style={{ minHeight }}
     >
       {children}
+
+      {active && !isOver ? (
+        <div className="pointer-events-none absolute inset-0 z-10 ring-1 ring-inset ring-blue-200" />
+      ) : null}
+
+      {isOver ? (
+        <div className="pointer-events-none absolute inset-0 z-20 bg-blue-300/20 ring-4 ring-inset ring-blue-500" />
+      ) : null}
     </div>
   )
 }
@@ -1562,19 +2329,46 @@ function DragOverlayCard({ block, count = 1 }: { block: ScheduleBlockRow; count?
   )
 }
 
-function UnassignedBlockCard({ item }: { item: ScheduleBlockRow }) {
+function UnassignedBlockCard({
+  item,
+  selected,
+  onCancel,
+}: {
+  item: ScheduleBlockRow
+  selected?: boolean
+  onCancel?: () => void
+}) {
   return (
-    <div className="border-b border-slate-400 bg-white text-[12px] leading-tight">
-      <div className="grid grid-cols-[58px_1fr] border-b border-slate-300">
+    <div
+      className={`border-b text-[12px] leading-tight transition-colors ${
+        selected
+          ? "border-blue-400 bg-blue-50 ring-2 ring-inset ring-blue-400"
+          : "border-slate-400 bg-white hover:bg-slate-50"
+      }`}
+    >
+      <div className="grid grid-cols-[58px_1fr_42px] border-b border-slate-300">
         <div className="border-r border-slate-300 px-2 py-1 text-slate-700">
           品名
         </div>
+
         <div
           className="truncate px-2 py-1 font-bold"
           title={item.product_name ?? ""}
         >
           {item.product_name ?? "-"}
         </div>
+
+        <button
+          type="button"
+          className="border-l border-slate-300 px-1 py-1 text-[11px] text-red-600 hover:bg-red-50"
+          onClick={(e) => {
+            e.stopPropagation()
+            onCancel?.()
+          }}
+          title="未割当リストから削除"
+        >
+          削除
+        </button>
       </div>
 
       <div className="grid grid-cols-[58px_1fr_58px_1fr] border-b border-slate-300">
@@ -1679,28 +2473,28 @@ function NoteCell({
 
 function CheckCell({
   checked,
+  completed,
   onToggle,
 }: {
   checked: boolean
+  completed?: boolean
   onToggle?: () => void
 }) {
   return (
-    <div className="flex items-center justify-center border-r border-slate-300 px-1 py-0.5">
-      <button
-        type="button"
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation()
-          onToggle?.()
-        }}
-        className={`inline-flex h-4 w-4 items-center justify-center border text-[10px] ${
-          checked
-            ? "border-slate-800 bg-slate-800 text-white"
-            : "border-slate-400 bg-white text-transparent hover:bg-slate-100"
+    <div
+      className={`flex items-center justify-center border-r border-slate-300 px-1 py-0.5 ${
+        completed ? "bg-[#b7b7b7]" : ""
+      }`}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onToggle}
+        onClick={(e) => e.stopPropagation()}
+        className={`h-4 w-4 ${
+          completed ? "opacity-60 accent-slate-500" : "accent-slate-900"
         }`}
-      >
-        ✓
-      </button>
+      />
     </div>
   )
 }
@@ -1750,9 +2544,19 @@ function Info({
   strong?: boolean
 }) {
   return (
-    <div className={`rounded-lg border bg-white ${compact ? "p-2.5" : "p-3"}`}>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={`mt-1 break-words ${strong ? "text-base font-bold" : "text-sm font-medium"}`}>
+    <div
+      className={`rounded-lg border bg-white ${
+        compact ? "px-2.5 py-2" : "p-3"
+      }`}
+    >
+      <div className="text-[11px] leading-tight text-muted-foreground">
+        {label}
+      </div>
+      <div
+        className={`mt-0.5 break-words leading-snug ${
+          strong ? "text-sm font-bold" : "text-sm font-semibold"
+        }`}
+      >
         {value || "-"}
       </div>
     </div>
