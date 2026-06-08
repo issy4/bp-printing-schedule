@@ -1531,7 +1531,7 @@ style={{
     <Button
       type="button"
       variant="secondary"
-      className="h-14 text-base font-bold"
+      className="h-14 bg-green-600 text-base font-bold text-white hover:bg-green-700"
       onClick={() => void handleWorkTimeAction(selectedBlock, "start")}
       disabled={!!selectedBlock.actual_start_at && !selectedBlock.actual_end_at}
     >
@@ -1541,7 +1541,7 @@ style={{
     <Button
       type="button"
       variant="secondary"
-      className="h-14 text-base font-bold"
+      className="h-14 bg-red-600 text-base font-bold text-white hover:bg-red-700"
       onClick={() => void handleWorkTimeAction(selectedBlock, "stop")}
       disabled={!selectedBlock.actual_start_at || !!selectedBlock.actual_end_at}
     >
