@@ -1523,65 +1523,72 @@ style={{
     </div>
 
     {/* 作業記録 */}
-    <div className="mt-4 rounded-xl border bg-white p-3">
-      <div className="mb-2 text-sm font-bold">作業記録</div>
+    <div className="mt-4 rounded-xl border bg-white p-4">
+  <div className="mb-3 text-sm font-bold">作業記録</div>
 
-      <div className="grid grid-cols-3 gap-2 text-sm">
-        <div className="rounded-md border bg-slate-50 p-2">
-          <div className="text-xs text-muted-foreground">開始時刻</div>
-          <div className="font-bold">
-            {formatDateTimeJP(selectedBlock.actual_start_at)}
-          </div>
-        </div>
+  {/* ボタンを大きく表示 */}
+  <div className="grid grid-cols-2 gap-3">
+    <Button
+      type="button"
+      variant="secondary"
+      className="h-14 text-base font-bold"
+      onClick={() => void handleWorkTimeAction(selectedBlock, "start")}
+      disabled={!!selectedBlock.actual_start_at && !selectedBlock.actual_end_at}
+    >
+      作業開始
+    </Button>
 
-        <div className="rounded-md border bg-slate-50 p-2">
-          <div className="text-xs text-muted-foreground">停止時刻</div>
-          <div className="font-bold">
-            {formatDateTimeJP(selectedBlock.actual_end_at)}
-          </div>
-        </div>
+    <Button
+      type="button"
+      variant="secondary"
+      className="h-14 text-base font-bold"
+      onClick={() => void handleWorkTimeAction(selectedBlock, "stop")}
+      disabled={!selectedBlock.actual_start_at || !!selectedBlock.actual_end_at}
+    >
+      作業停止
+    </Button>
+  </div>
 
-        <div className="rounded-md border bg-slate-50 p-2">
-          <div className="text-xs text-muted-foreground">作業時間</div>
-          <div className="font-bold">
-            {formatWorkMinutes(selectedBlock.actual_work_minutes)}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-3 flex justify-end gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => void handleWorkTimeAction(selectedBlock, "start")}
-          disabled={!!selectedBlock.actual_start_at && !selectedBlock.actual_end_at}
-        >
-          作業開始
-        </Button>
-
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => void handleWorkTimeAction(selectedBlock, "stop")}
-          disabled={!selectedBlock.actual_start_at || !!selectedBlock.actual_end_at}
-        >
-          作業停止
-        </Button>
-
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => {
-            if (confirm("作業時間をクリアしますか？")) {
-              void handleWorkTimeAction(selectedBlock, "clear")
-            }
-          }}
-          disabled={!selectedBlock.actual_start_at && !selectedBlock.actual_end_at}
-        >
-          クリア
-        </Button>
+  {/* 時刻表示は小さく */}
+  <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+    <div className="rounded-md border bg-slate-50 px-2 py-1.5">
+      <div className="text-[10px] text-muted-foreground">開始時刻</div>
+      <div className="mt-0.5 font-medium">
+        {formatDateTimeJP(selectedBlock.actual_start_at)}
       </div>
     </div>
+
+    <div className="rounded-md border bg-slate-50 px-2 py-1.5">
+      <div className="text-[10px] text-muted-foreground">停止時刻</div>
+      <div className="mt-0.5 font-medium">
+        {formatDateTimeJP(selectedBlock.actual_end_at)}
+      </div>
+    </div>
+
+    <div className="rounded-md border bg-slate-50 px-2 py-1.5">
+      <div className="text-[10px] text-muted-foreground">作業時間</div>
+      <div className="mt-0.5 font-bold">
+        {formatWorkMinutes(selectedBlock.actual_work_minutes)}
+      </div>
+    </div>
+  </div>
+
+  <div className="mt-3 flex justify-end">
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={() => {
+        if (confirm("作業時間をクリアしますか？")) {
+          void handleWorkTimeAction(selectedBlock, "clear")
+        }
+      }}
+      disabled={!selectedBlock.actual_start_at && !selectedBlock.actual_end_at}
+    >
+      クリア
+    </Button>
+  </div>
+</div>
 
     {/* 詳細情報：折りたたみ */}
     <details className="mt-4 rounded-xl border bg-white">
