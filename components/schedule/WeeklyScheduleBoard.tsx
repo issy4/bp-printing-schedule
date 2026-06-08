@@ -2401,9 +2401,19 @@ function Info({
   strong?: boolean
 }) {
   return (
-    <div className={`rounded-lg border bg-white ${compact ? "p-2.5" : "p-3"}`}>
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={`mt-1 break-words ${strong ? "text-base font-bold" : "text-sm font-medium"}`}>
+    <div
+      className={`rounded-lg border bg-white ${
+        compact ? "px-2.5 py-2" : "p-3"
+      }`}
+    >
+      <div className="text-[11px] leading-tight text-muted-foreground">
+        {label}
+      </div>
+      <div
+        className={`mt-0.5 break-words leading-snug ${
+          strong ? "text-sm font-bold" : "text-sm font-semibold"
+        }`}
+      >
         {value || "-"}
       </div>
     </div>
