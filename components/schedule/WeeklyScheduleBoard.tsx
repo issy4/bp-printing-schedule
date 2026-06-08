@@ -1498,29 +1498,29 @@ style={{
             {selectedBlock ? (
   <>
     {/* 重要情報 */}
-    <div className="rounded-xl border bg-slate-50 p-4">
-      <div className="grid gap-3 md:grid-cols-[140px_1fr]">
-        <Info label="受注番号" value={getSafeOrderNumber(selectedBlock)} compact />
-        <Info label="品名" value={selectedBlock.product_name} compact strong />
-      </div>
+<div className="rounded-xl border bg-slate-50 p-3">
+  <div className="grid gap-2 md:grid-cols-[130px_1fr]">
+    <Info label="受注番号" value={getSafeOrderNumber(selectedBlock)} compact />
+    <Info label="品名" value={selectedBlock.product_name} compact strong />
+  </div>
 
-      <div className="mt-3 grid gap-3 md:grid-cols-3">
-        <Info label="印刷単位" value={formatPrintUnitSummary(selectedBlock)} compact />
-        <Info label="版型" value={selectedBlock.plate_size} compact />
-        <Info
-          label="色数"
-          value={`${selectedBlock.color_front ?? "-"}/${selectedBlock.color_back ?? "-"}`}
-          compact
-        />
-        <Info
-          label="通紙"
-          value={selectedBlock.print_count?.toLocaleString("ja-JP")}
-          compact
-        />
-        <Info label="印刷機" value={selectedBlock.machine_name} compact />
-        <Info label="日付" value={selectedBlock.scheduled_date} compact />
-      </div>
-    </div>
+  <div className="mt-2 grid gap-2 md:grid-cols-3">
+    <Info label="印刷単位" value={formatPrintUnitSummary(selectedBlock)} compact />
+    <Info label="版型" value={selectedBlock.plate_size} compact />
+    <Info
+      label="色数"
+      value={`${selectedBlock.color_front ?? "-"}/${selectedBlock.color_back ?? "-"}`}
+      compact
+    />
+    <Info
+      label="通紙"
+      value={selectedBlock.print_count?.toLocaleString("ja-JP")}
+      compact
+    />
+    <Info label="印刷機" value={selectedBlock.machine_name} compact />
+    <Info label="日付" value={selectedBlock.scheduled_date} compact />
+  </div>
+</div>
 
     {/* 作業記録 */}
     <div className="mt-4 rounded-xl border bg-white p-4">
@@ -1545,7 +1545,7 @@ style={{
       onClick={() => void handleWorkTimeAction(selectedBlock, "stop")}
       disabled={!selectedBlock.actual_start_at || !!selectedBlock.actual_end_at}
     >
-      作業停止
+      作業終了
     </Button>
   </div>
 
