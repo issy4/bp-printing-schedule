@@ -683,56 +683,69 @@ if (selectedBlock?.block_id === block.block_id) {
 }
 
   async function handleMoveBlockOrder(block: ScheduleBlockRow, direction: "up" | "down") {
-    if (!block.machine_id || !block.scheduled_date || !block.shift_category) return
+  if (!block.machine_id || !block.scheduled_date || !block.shift_category) return
 
-    const key = makeCellKey(block.machine_id, block.shift_category, block.scheduled_date)
-    const currentCell = data.cells[key]
-    if (!currentCell) return
+  const key = makeCellKey(block.machine_id, block.shift_category, block.scheduled_date)
+  const currentCell = data.cells[key]
+  if (!currentCell) return
 
-    const sortedBlocks = [...currentCell.blocks].sort((a, b) => {
-      const seqA = a.sequence_no ?? 9999
-      const seqB = b.sequence_no ?? 9999
-      if (seqA !== seqB) return seqA - seqB
-      return a.unit_name.localeCompare(b.unit_name, "ja")
-    })
+  const sortedBlocks = [...currentCell.blocks].sort((a, b) => {
+    const seqA = a.sequence_no ?? 9999
+    const seqB = b.sequence_no ?? 9999
 
-    const currentIndex = sortedBlocks.findIndex((b) => b.block_id === block.block_id)
-    if (currentIndex < 0) return
+    if (seqA !== seqB) return seqA - seqB
 
-    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1
-    if (targetIndex < 0 || targetIndex >= sortedBlocks.length) return
+    // sequence_no が重複・null の場合の保険
+    return a.block_id.localeCompare(b.block_id)
+  })
 
-    const currentBlock = sortedBlocks[currentIndex]
-    const targetBlock = sortedBlocks[targetIndex]
-    const currentSeq = currentBlock.sequence_no ?? currentIndex + 1
-    const targetSeq = targetBlock.sequence_no ?? targetIndex + 1
-    const previousData = data
+  const currentIndex = sortedBlocks.findIndex((b) => b.block_id === block.block_id)
+  if (currentIndex < 0) return
 
-    setData((current) =>
-      swapBlockSequenceInCalendarData(current, currentBlock, targetBlock, currentSeq, targetSeq),
-    )
+  const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1
+  if (targetIndex < 0 || targetIndex >= sortedBlocks.length) return
 
-    const [resA, resB] = await Promise.all([
-      fetch(`/api/schedule/block/${currentBlock.block_id}`, {
+  const reorderedBlocks = [...sortedBlocks]
+  const [moved] = reorderedBlocks.splice(currentIndex, 1)
+  reorderedBlocks.splice(targetIndex, 0, moved)
+
+  const resequencedBlocks = reorderedBlocks.map((item, index) => ({
+    ...item,
+    sequence_no: index + 1,
+  }))
+
+  const previousData = data
+
+  setData((current) =>
+    resequenceCellBlocksInCalendarData(
+      current,
+      block.machine_id!,
+      block.shift_category as "day" | "night",
+      block.scheduled_date!,
+      resequencedBlocks,
+    ),
+  )
+
+  const results = await Promise.all(
+    resequencedBlocks.map((item) =>
+      fetch(`/api/schedule/block/${item.block_id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sequence_no: targetSeq }),
+        body: JSON.stringify({
+          sequence_no: item.sequence_no,
+        }),
       }),
-      fetch(`/api/schedule/block/${targetBlock.block_id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sequence_no: currentSeq }),
-      }),
-    ])
+    ),
+  )
 
-    if (!resA.ok || !resB.ok) {
-      setData(previousData)
-      alert("順番の保存に失敗しました。")
-      return
-    }
-
-    await refreshDataSilently(baseDate)
+  if (results.some((res) => !res.ok)) {
+    setData(previousData)
+    alert("順番の保存に失敗しました。")
+    return
   }
+
+  await refreshDataSilently(baseDate)
+}
 
   async function updateBlockAssignment({
     block,
@@ -1481,30 +1494,41 @@ style={{
 />
 
 <div className="space-y-0">
-  {cell.blocks.map((block, index) => (
-    <DraggableBlock key={block.block_id} block={block} source="assigned">
-      <ScheduleCellItem
-  block={block}
-  gridClass={scheduleCellGrid}
-  focused={isMachineFocused}
-  selected={selectedAssignedBlockIds.has(block.block_id)}
-  canMoveUp={index > 0}
-  canMoveDown={index < cell.blocks.length - 1}
-  onMoveUp={() => handleMoveBlockOrder(block, "up")}
-  onMoveDown={() => handleMoveBlockOrder(block, "down")}
-  onClick={(event) => {
-    if (event.ctrlKey || event.metaKey) {
-      toggleAssignedSelection(block)
-      return
-    }
+  {[...cell.blocks]
+    .sort((a, b) => {
+      const seqA = a.sequence_no ?? 9999
+      const seqB = b.sequence_no ?? 9999
 
-    setSelectedBlock(block)
-  }}
-  onToggleProgress={(field, checked) => handleToggleProgress(block, field, checked)}
-  onSaveNote={(note) => handleSaveNote(block, note)}
-/>
-    </DraggableBlock>
-  ))}
+      if (seqA !== seqB) return seqA - seqB
+
+      return a.block_id.localeCompare(b.block_id)
+    })
+    .map((block, index, sortedBlocks) => (
+      <DraggableBlock key={block.block_id} block={block} source="assigned">
+        <ScheduleCellItem
+          block={block}
+          gridClass={scheduleCellGrid}
+          focused={isMachineFocused}
+          selected={selectedAssignedBlockIds.has(block.block_id)}
+          canMoveUp={index > 0}
+          canMoveDown={index < sortedBlocks.length - 1}
+          onMoveUp={() => handleMoveBlockOrder(block, "up")}
+          onMoveDown={() => handleMoveBlockOrder(block, "down")}
+          onClick={(event) => {
+            if (event.ctrlKey || event.metaKey) {
+              toggleAssignedSelection(block)
+              return
+            }
+
+            setSelectedBlock(block)
+          }}
+          onToggleProgress={(field, checked) =>
+            handleToggleProgress(block, field, checked)
+          }
+          onSaveNote={(note) => handleSaveNote(block, note)}
+        />
+      </DraggableBlock>
+    ))}
 </div>
                               </>
                             ) : (
@@ -1805,6 +1829,34 @@ function swapBlockSequenceInCalendarData(
         return a.unit_name.localeCompare(b.unit_name, "ja")
       }),
     }
+  }
+
+  return {
+    ...current,
+    cells: nextCells,
+  }
+}
+
+function resequenceCellBlocksInCalendarData(
+  current: WeeklyCalendarData,
+  machineId: string,
+  shiftCategory: "day" | "night",
+  date: string,
+  resequencedBlocks: ScheduleBlockRow[],
+): WeeklyCalendarData {
+  const key = makeCellKey(machineId, shiftCategory, date)
+
+  const nextCells: Record<string, WeeklyCalendarCell> = {
+    ...current.cells,
+  }
+
+  if (!nextCells[key]) {
+    return current
+  }
+
+  nextCells[key] = {
+    ...nextCells[key],
+    blocks: resequencedBlocks,
   }
 
   return {
