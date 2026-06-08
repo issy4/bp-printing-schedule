@@ -422,6 +422,24 @@ const dayColumnWidthPx = isMachineFocused
 
   const selectedUnassignedCount = selectedUnassignedBlocks.length 
 
+  const selectedAssignedBlocks = React.useMemo(() => {
+  if (selectedAssignedBlockIds.size === 0) return []
+
+  const blocks: ScheduleBlockRow[] = []
+
+  for (const cell of Object.values(data.cells)) {
+    for (const block of cell.blocks) {
+      if (selectedAssignedBlockIds.has(block.block_id)) {
+        blocks.push(block)
+      }
+    }
+  }
+
+  return blocks
+}, [data.cells, selectedAssignedBlockIds])
+
+const selectedAssignedCount = selectedAssignedBlocks.length
+
   React.useEffect(() => {
     setSelectedUnassignedBlockIds((current) => {
       if (current.size === 0) return current
@@ -856,9 +874,13 @@ if (selectedBlock?.block_id === block.block_id) {
 
     if (dropData.type === "schedule-cell") {
       const blocksToMove =
-        dragData.source === "unassigned" && selectedUnassignedBlockIds.has(dragData.block.block_id)
-          ? selectedUnassignedBlocks
-          : [dragData.block]
+  dragData.source === "unassigned" &&
+  selectedUnassignedBlockIds.has(dragData.block.block_id)
+    ? selectedUnassignedBlocks
+    : dragData.source === "assigned" &&
+        selectedAssignedBlockIds.has(dragData.block.block_id)
+      ? selectedAssignedBlocks
+      : [dragData.block]
 
       const startSequenceNo = getNextSequenceNo(
         data,
@@ -878,6 +900,7 @@ if (selectedBlock?.block_id === block.block_id) {
         }, current),
       )
       clearUnassignedSelection()
+      clearAssignedSelection()
 
       const results = await Promise.all(
         blocksToMove.map((block, index) =>
@@ -1693,7 +1716,16 @@ style={{
       </div>
 
       <DragOverlay>
-        {draggingBlock ? <DragOverlayCard block={draggingBlock} count={selectedUnassignedBlockIds.has(draggingBlock.block_id) ? selectedUnassignedCount : 1} /> : null}
+        {draggingBlock ? <DragOverlayCard
+  block={draggingBlock}
+  count={
+    selectedUnassignedBlockIds.has(draggingBlock.block_id)
+      ? selectedUnassignedCount
+      : selectedAssignedBlockIds.has(draggingBlock.block_id)
+        ? selectedAssignedCount
+        : 1
+  }
+/> : null}
       </DragOverlay>
     </DndContext>
   )
