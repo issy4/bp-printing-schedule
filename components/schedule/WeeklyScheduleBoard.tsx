@@ -630,30 +630,32 @@ function clearAssignedSelection() {
     const body = await res.json().catch(() => ({}))
 
     if (!res.ok) {
-      throw new Error(body.error ?? "作業時間の保存に失敗しました")
-    }
+  throw new Error(body.error ?? "作業時間の保存に失敗しました")
+}
 
-    await refreshDataSilently(baseDate)
+if (action === "start" || action === "stop") {
+  setSelectedBlock(null)
+  await refreshDataSilently(baseDate)
+  return
+}
 
-    if (action === "start" || action === "stop") {
-      setSelectedBlock(null)
-      return
-    }
+await refreshDataSilently(baseDate)
 
-    if (selectedBlock?.block_id === block.block_id) {
-      setSelectedBlock((current) =>
-        current
-          ? {
-              ...current,
-              actual_start_at: body.data?.actual_start_at ?? null,
-              actual_end_at: body.data?.actual_end_at ?? null,
-              actual_work_minutes: body.data?.actual_work_minutes ?? null,
-              printing_completed: body.data?.printing_completed ?? current.printing_completed,
-              unit_status: body.data?.unit_status ?? current.unit_status,
-            }
-          : current,
-      )
-    }
+if (selectedBlock?.block_id === block.block_id) {
+  setSelectedBlock((current) =>
+    current
+      ? {
+          ...current,
+          actual_start_at: body.data?.actual_start_at ?? null,
+          actual_end_at: body.data?.actual_end_at ?? null,
+          actual_work_minutes: body.data?.actual_work_minutes ?? null,
+          printing_completed:
+            body.data?.printing_completed ?? current.printing_completed,
+          unit_status: body.data?.unit_status ?? current.unit_status,
+        }
+      : current,
+  )
+}
   } catch (e) {
     setData(previousData)
     setError(e instanceof Error ? e.message : "作業時間の保存に失敗しました")
