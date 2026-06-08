@@ -1499,26 +1499,19 @@ style={{
   <>
     {/* 重要情報 */}
 <div className="rounded-xl border bg-slate-50 p-3">
-  <div className="grid gap-2 md:grid-cols-[130px_1fr]">
-    <Info label="受注番号" value={getSafeOrderNumber(selectedBlock)} compact />
-    <Info label="品名" value={selectedBlock.product_name} compact strong />
-  </div>
+  <div className="grid gap-2 md:grid-cols-[120px_1fr]">
+    <Info
+      label="受注番号"
+      value={getSafeOrderNumber(selectedBlock)}
+      compact
+    />
 
-  <div className="mt-2 grid gap-2 md:grid-cols-3">
-    <Info label="印刷単位" value={formatPrintUnitSummary(selectedBlock)} compact />
-    <Info label="版型" value={selectedBlock.plate_size} compact />
     <Info
-      label="色数"
-      value={`${selectedBlock.color_front ?? "-"}/${selectedBlock.color_back ?? "-"}`}
+      label="品名"
+      value={selectedBlock.product_name}
       compact
+      strong
     />
-    <Info
-      label="通紙"
-      value={selectedBlock.print_count?.toLocaleString("ja-JP")}
-      compact
-    />
-    <Info label="印刷機" value={selectedBlock.machine_name} compact />
-    <Info label="日付" value={selectedBlock.scheduled_date} compact />
   </div>
 </div>
 
@@ -1591,22 +1584,79 @@ style={{
 </div>
 
     {/* 詳細情報：折りたたみ */}
-    <details className="mt-4 rounded-xl border bg-white">
-      <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-        詳細情報を表示
-      </summary>
+<details className="mt-4 rounded-xl border bg-white">
+  <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+    詳細情報を表示
+  </summary>
 
-      <div className="grid gap-3 border-t p-4 md:grid-cols-2">
-        <Info label="得意先" value={selectedBlock.customer_name} />
-        <Info label="色指定・備考" value={selectedBlock.color_note} />
-        <Info label="特記" value={selectedBlock.block_note} />
-        <Info
-          label="順番"
-          value={selectedBlock.sequence_no ? String(selectedBlock.sequence_no) : null}
-        />
-        <Info label="状態" value={getStatusLabel(selectedBlock.block_status)} />
-      </div>
-    </details>
+  <div className="grid gap-3 border-t p-4 md:grid-cols-3">
+    <Info
+      label="得意先"
+      value={selectedBlock.customer_name}
+      compact
+    />
+
+    <Info
+      label="印刷単位"
+      value={formatPrintUnitSummary(selectedBlock)}
+      compact
+    />
+
+    <Info
+      label="版型"
+      value={selectedBlock.plate_size}
+      compact
+    />
+
+    <Info
+      label="色数"
+      value={`${selectedBlock.color_front ?? "-"}/${selectedBlock.color_back ?? "-"}`}
+      compact
+    />
+
+    <Info
+      label="色指定・備考"
+      value={selectedBlock.color_note}
+      compact
+    />
+
+    <Info
+      label="通紙"
+      value={selectedBlock.print_count?.toLocaleString("ja-JP")}
+      compact
+    />
+
+    <Info
+      label="特記"
+      value={selectedBlock.block_note}
+      compact
+    />
+
+    <Info
+      label="印刷機"
+      value={selectedBlock.machine_name}
+      compact
+    />
+
+    <Info
+      label="日付"
+      value={selectedBlock.scheduled_date}
+      compact
+    />
+
+    <Info
+      label="順番"
+      value={selectedBlock.sequence_no ? String(selectedBlock.sequence_no) : null}
+      compact
+    />
+
+    <Info
+      label="状態"
+      value={getStatusLabel(selectedBlock.block_status)}
+      compact
+    />
+  </div>
+</details>
 
     <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
       この画面は、割当済み案件の内容確認、作業時間の記録、「未割当に戻す」操作用です。
