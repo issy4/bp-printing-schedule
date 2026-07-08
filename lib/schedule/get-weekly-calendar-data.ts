@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { unstable_noStore as noStore } from "next/cache"
 import type {
   MachineRow,
   ScheduleBlockRow,
@@ -16,11 +17,16 @@ function normalizeShift(shift: ShiftCategory): "day" | "night" {
   return shift === "night" ? "night" : "day"
 }
 
+function toYmd(value: string) {
+  return value.slice(0, 10)
+}
+
 function getShiftLabel(shift: "day" | "night"): "日勤" | "夜勤" {
   return shift === "night" ? "夜勤" : "日勤"
 }
 
 export async function getWeeklyCalendarData(baseDate?: string): Promise<WeeklyCalendarData> {
+  noStore()
   const supabase = await createClient()
   const { start, startYmd, endYmd } = getWeekRange(baseDate)
   const weekDays = buildWeekDays(start)
@@ -63,6 +69,15 @@ export async function getWeeklyCalendarData(baseDate?: string): Promise<WeeklyCa
   if (machinesError) {
     throw new Error(`印刷機マスタの取得に失敗しました: ${machinesError.message}`)
   }
+
+  console.log("schedule debug", {
+  startYmd,
+  endYmd,
+  weekRowsCount: weekRows?.length ?? 0,
+  unassignedRowsCount: unassignedRows?.length ?? 0,
+  machinesCount: machines?.length ?? 0,
+  firstWeekRow: weekRows?.[0],
+})
 
   const typedWeekRows = (weekRows ?? []) as ScheduleBlockRow[]
   const typedUnassignedRows = (unassignedRows ?? []) as ScheduleBlockRow[]
@@ -113,13 +128,14 @@ export async function getWeeklyCalendarData(baseDate?: string): Promise<WeeklyCa
     if (!row.machine_id || !row.scheduled_date) continue
 
     const shift = normalizeShift(row.shift_category)
-    const key = makeCellKey(row.machine_id, shift, row.scheduled_date)
+    const scheduledDate = toYmd(row.scheduled_date)
+    const key = makeCellKey(row.machine_id, shift, scheduledDate)
 
     if (!cells[key]) {
       cells[key] = {
         machine_id: row.machine_id,
         shift_category: shift,
-        date: row.scheduled_date,
+        date: scheduledDate,
         blocks: [],
       }
     }
@@ -132,7 +148,7 @@ export async function getWeeklyCalendarData(baseDate?: string): Promise<WeeklyCa
       const seqA = a.sequence_no ?? 9999
       const seqB = b.sequence_no ?? 9999
       if (seqA !== seqB) return seqA - seqB
-      return a.unit_name.localeCompare(b.unit_name, "ja")
+      return (a.unit_name ?? "").localeCompare(b.unit_name ?? "", "ja")
     })
   }
 
