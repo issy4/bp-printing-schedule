@@ -152,6 +152,23 @@ export async function getWeeklyCalendarData(baseDate?: string): Promise<WeeklyCa
     })
   }
 
+  const filledCells = Object.entries(cells)
+  .filter(([, cell]) => cell.blocks.length > 0)
+  .map(([key, cell]) => ({
+    key,
+    machine_id: cell.machine_id,
+    shift_category: cell.shift_category,
+    date: cell.date,
+    blocksCount: cell.blocks.length,
+    firstBlock: cell.blocks[0]?.unit_name,
+  }))
+
+console.log("schedule cells debug", {
+  cellsCount: Object.keys(cells).length,
+  filledCellsCount: filledCells.length,
+  firstFilledCells: filledCells.slice(0, 10),
+})
+
   return {
     weekDays,
     machineRows,
