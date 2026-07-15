@@ -234,6 +234,15 @@ function compactNumber(value: number | null) {
   return value.toLocaleString("ja-JP")
 }
 
+function formatMonthDay(value?: string | null) {
+  if (!value) return "-"
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "-"
+
+  return `${date.getMonth() + 1}/${date.getDate()}`
+}
+
 function formatDateTimeJP(value?: string | null) {
   if (!value) return "-"
   const d = new Date(value)
@@ -2270,6 +2279,7 @@ function DroppableScheduleCell({
   date: string
   shiftCategory: "day" | "night"
   active: boolean
+  minHeight?: number
   onClick: () => void
   children: React.ReactNode
 }) {
@@ -2410,12 +2420,31 @@ function UnassignedBlockCard({
         </div>
       </div>
 
-      <div className="grid grid-cols-[58px_1fr_58px_1fr]">
-        <div className="border-r border-slate-300 px-2 py-1 text-slate-700">版型</div>
-        <div className="border-r border-slate-300 px-2 py-1">{item.plate_size ?? "-"}</div>
-        <div className="border-r border-slate-300 px-2 py-1 text-slate-700">通紙</div>
-        <div className="px-2 py-1">{compactNumber(item.print_count)}</div>
-      </div>
+      <div className="grid grid-cols-[58px_1fr_58px_68px_58px_64px]">
+  <div className="border-r border-slate-300 px-2 py-1 text-slate-700">
+    版型
+  </div>
+
+  <div className="border-r border-slate-300 px-2 py-1">
+    {item.plate_size ?? "-"}
+  </div>
+
+  <div className="border-r border-slate-300 px-2 py-1 text-slate-700">
+    通紙
+  </div>
+
+  <div className="border-r border-slate-300 px-2 py-1 text-right">
+    {compactNumber(item.print_count)}
+  </div>
+
+  <div className="border-r border-slate-300 px-2 py-1 text-slate-700">
+    納品
+  </div>
+
+  <div className="px-2 py-1 text-right font-medium">
+    {formatMonthDay(item.legacy_delivery_date)}
+  </div>
+</div>
     </div>
   )
 }

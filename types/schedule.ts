@@ -56,6 +56,7 @@ export type ScheduleBlockRow = {
   customer_code: string | null
   customer_name: string | null
   product_name: string | null
+  legacy_delivery_date: string | null
   sales_user_code: string | null
   order_date: string | null
 
