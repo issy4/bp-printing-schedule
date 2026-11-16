@@ -225,6 +225,44 @@ function buildWeekDaysFromBase(baseDate?: string): WeekDay[] {
   })
 }
 
+// セル内は受注番号 → 部品名 → 同一部品内の手動順に並べる
+const scheduleOrderCollator = new Intl.Collator("ja", { numeric: true, sensitivity: "base" })
+
+function getScheduleGroup(block: ScheduleBlockRow) {
+  return {
+    order: (block.order_number ?? "").trim(),
+    part: (block.part_name ?? block.unit_name ?? "").trim(),
+  }
+}
+
+function isSameScheduleGroup(a: ScheduleBlockRow, b?: ScheduleBlockRow) {
+  if (!b) return false
+  const ga = getScheduleGroup(a)
+  const gb = getScheduleGroup(b)
+  return ga.order === gb.order && ga.part === gb.part
+}
+
+function compareScheduleBlocks(a: ScheduleBlockRow, b: ScheduleBlockRow) {
+  const ga = getScheduleGroup(a)
+  const gb = getScheduleGroup(b)
+  if (!ga.order && gb.order) return 1
+  if (ga.order && !gb.order) return -1
+  const orderResult = scheduleOrderCollator.compare(ga.order, gb.order)
+  if (orderResult !== 0) return orderResult
+
+  if (!ga.part && gb.part) return 1
+  if (ga.part && !gb.part) return -1
+  const partResult = scheduleOrderCollator.compare(ga.part, gb.part)
+  if (partResult !== 0) return partResult
+
+  const seqA = a.sequence_no ?? Number.MAX_SAFE_INTEGER
+  const seqB = b.sequence_no ?? Number.MAX_SAFE_INTEGER
+  if (seqA !== seqB) return seqA - seqB
+  const unitResult = scheduleOrderCollator.compare(a.unit_name ?? "", b.unit_name ?? "")
+  if (unitResult !== 0) return unitResult
+  return a.block_id.localeCompare(b.block_id)
+}
+
 function makeCellKey(machineId: string, shiftCategory: string, date: string) {
   return `${machineId}__${shiftCategory}__${date}`
 }
@@ -702,15 +740,7 @@ if (selectedBlock?.block_id === block.block_id) {
   const currentCell = data.cells[key]
   if (!currentCell) return
 
-  const sortedBlocks = [...currentCell.blocks].sort((a, b) => {
-    const seqA = a.sequence_no ?? 9999
-    const seqB = b.sequence_no ?? 9999
-
-    if (seqA !== seqB) return seqA - seqB
-
-    // sequence_no が重複・null の場合の保険
-    return a.block_id.localeCompare(b.block_id)
-  })
+  const sortedBlocks = [...currentCell.blocks].sort(compareScheduleBlocks)
 
   const currentIndex = sortedBlocks.findIndex((b) => b.block_id === block.block_id)
   if (currentIndex < 0) return
@@ -1527,14 +1557,7 @@ style={{
 
 <div className="space-y-0">
   {[...cell.blocks]
-    .sort((a, b) => {
-      const seqA = a.sequence_no ?? 9999
-      const seqB = b.sequence_no ?? 9999
-
-      if (seqA !== seqB) return seqA - seqB
-
-      return a.block_id.localeCompare(b.block_id)
-    })
+    .sort(compareScheduleBlocks)
     .map((block, index, sortedBlocks) => (
       <DraggableBlock key={block.block_id} block={block} source="assigned">
         <ScheduleCellItem
@@ -1542,8 +1565,8 @@ style={{
           gridClass={scheduleCellGrid}
           focused={isMachineFocused}
           selected={selectedAssignedBlockIds.has(block.block_id)}
-          canMoveUp={index > 0}
-          canMoveDown={index < sortedBlocks.length - 1}
+          canMoveUp={isSameScheduleGroup(block, sortedBlocks[index - 1])}
+          canMoveDown={isSameScheduleGroup(block, sortedBlocks[index + 1])}
           onMoveUp={() => handleMoveBlockOrder(block, "up")}
           onMoveDown={() => handleMoveBlockOrder(block, "down")}
           onClick={(event) => {
