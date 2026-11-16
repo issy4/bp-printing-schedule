@@ -423,19 +423,30 @@ const [assignedSelectMode, setAssignedSelectMode] = React.useState(false)
         return
       }
       attempts += 1
+      // ここで送るのは使い捨てnonceだけ（認証情報は含まない）。
+      // 親ERPの実際のPreview URLが異なる場合も、拒否理由を受け取れるようにする。
       window.opener.postMessage(
         { type: "printing-schedule:auth-request", nonce },
-        ERP_ORIGIN,
+        "*",
       )
     }
 
     const receiveSession = async (event: MessageEvent) => {
-      if (event.origin !== ERP_ORIGIN || event.source !== window.opener) return
-      if (event.data?.nonce !== nonce) return
+      if (event.source !== window.opener || event.data?.nonce !== nonce) return
+      if (event.origin !== ERP_ORIGIN) {
+        // 想定外の送信元から受け取ったトークンを利用しない
+        receivedResponse = true
+        setErpAuthStatus(`ERPのURLが一致しません。実際: ${event.origin} / 設定: ${ERP_ORIGIN}`)
+        if (interval) clearInterval(interval)
+        return
+      }
       if (event.data?.type === "printing-schedule:auth-error") {
         receivedResponse = true
-        setErpAuthStatus(event.data.message === "no-session"
+        const message = event.data.message
+        setErpAuthStatus(message === "no-session"
           ? "ERP側の有効なログインが確認できません"
+          : message === "origin-mismatch"
+          ? `印刷スケジュールのURLがERPの許可先と一致しません。ERPの設定: ${String(event.data.expected ?? "-")} / この画面: ${window.location.origin}`
           : "ERP側の認証取得でエラーが発生しました")
         if (interval) clearInterval(interval)
         return
