@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { getScheduleErpSession } from "@/lib/schedule/erp-session"
 
 type Shift = "day" | "night"
 
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const { data: authData, error: authError } = await supabase.auth.getUser()
-    if (authError || !authData.user) {
-      return NextResponse.json({ success: false, error: "備考の保存にはログインが必要です" }, { status: 401 })
+    if (request.headers.get("origin") !== new URL(request.url).origin) {
+      return NextResponse.json({ success: false, error: "不正なアクセス元です" }, { status: 403 })
     }
+    const session = await getScheduleErpSession()
+    if (!session) {
+      return NextResponse.json({ success: false, error: "ERPから開き直してください（認証期限切れ）" }, { status: 401 })
+    }
+    const { client: supabase, user } = session
 
     const body: unknown = await request.json()
     if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -38,7 +41,7 @@ export async function PUT(request: NextRequest) {
         scheduled_date: date,
         shift_category: shiftCategory as Shift,
         memo,
-        updated_by: authData.user.id,
+        updated_by: user.id,
         updated_at: new Date().toISOString(),
       }, { onConflict: "machine_id,scheduled_date,shift_category" })
 
