@@ -389,17 +389,20 @@ const [assignedSelectMode, setAssignedSelectMode] = React.useState(false)
   const [unassignedCollapsed, setUnassignedCollapsed] = React.useState(false)
 
   const [cellMemoAuthenticated, setCellMemoAuthenticated] = React.useState(false)
+  const [erpAuthStatus, setErpAuthStatus] = React.useState("ERP認証を確認しています…")
 
   // ERPメニューから開いたタブだけが、親ウィンドウからログイン情報を受け取る
   React.useEffect(() => {
     let active = true
     let attempts = 0
+    let receivedResponse = false
     const nonce = crypto.randomUUID()
     let interval: ReturnType<typeof setInterval> | undefined
 
     const enableMemo = async () => {
       if (!active) return
       setCellMemoAuthenticated(true)
+      setErpAuthStatus("ERPログイン確認済み・備考を編集できます")
       try {
         const refreshed = await fetchWeeklyCalendarData(initialBaseDate)
         if (active) setData(refreshed)
@@ -409,7 +412,13 @@ const [assignedSelectMode, setAssignedSelectMode] = React.useState(false)
     }
 
     const requestSession = () => {
-      if (!window.opener || window.opener.closed || attempts >= 8) {
+      if (!window.opener || window.opener.closed) {
+        setErpAuthStatus("ERPとタブ間接続できません。ERPの製造メニューから開き直してください")
+        if (interval) clearInterval(interval)
+        return
+      }
+      if (attempts >= 8) {
+        if (!receivedResponse) setErpAuthStatus("ERPから応答がありません。タブ間通信を確認してください")
         if (interval) clearInterval(interval)
         return
       }
@@ -422,8 +431,19 @@ const [assignedSelectMode, setAssignedSelectMode] = React.useState(false)
 
     const receiveSession = async (event: MessageEvent) => {
       if (event.origin !== ERP_ORIGIN || event.source !== window.opener) return
-      if (event.data?.type !== "printing-schedule:auth-response" || event.data.nonce !== nonce) return
+      if (event.data?.nonce !== nonce) return
+      if (event.data?.type === "printing-schedule:auth-error") {
+        receivedResponse = true
+        setErpAuthStatus(event.data.message === "no-session"
+          ? "ERP側の有効なログインが確認できません"
+          : "ERP側の認証取得でエラーが発生しました")
+        if (interval) clearInterval(interval)
+        return
+      }
+      if (event.data?.type !== "printing-schedule:auth-response") return
       if (typeof event.data.accessToken !== "string") return
+      receivedResponse = true
+      setErpAuthStatus("ERP認証情報を受信・検証中…")
       if (interval) clearInterval(interval)
       try {
         const res = await fetch("/api/schedule/auth/session", {
@@ -434,11 +454,13 @@ const [assignedSelectMode, setAssignedSelectMode] = React.useState(false)
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
           console.error("ERP認証の引き継ぎに失敗:", err.error ?? res.status)
+          setErpAuthStatus(`認証検証エラー HTTP ${res.status}：${String(err.error ?? "不明")}`)
           return
         }
         await enableMemo()
       } catch (error) {
         console.error("ERP認証の引き継ぎに失敗:", error)
+        setErpAuthStatus("ERP認証通信エラー")
       }
     }
 
@@ -453,6 +475,7 @@ const [assignedSelectMode, setAssignedSelectMode] = React.useState(false)
       } catch (error) {
         console.error("ERPセッションの確認に失敗:", error)
       }
+      setErpAuthStatus("ERPのログイン情報を受信しています…")
       requestSession()
       interval = setInterval(requestSession, 1500)
     })()
@@ -1434,6 +1457,9 @@ async function handleCancelSelectedUnassignedBlocks() {
 </DroppableUnassignedArea>
 
         <section className="flex min-w-0 flex-col overflow-hidden">
+          <div role="status" className={`border-b px-3 py-1 text-[11px] ${cellMemoAuthenticated ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}`}>
+            備考編集の認証状態：{erpAuthStatus}
+          </div>
           <div className="flex items-center justify-between gap-3 border-b p-3">
             <div className="flex items-center gap-2">
               <Button variant="outline" size="icon" onClick={() => goWeek(-1)}>
