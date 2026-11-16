@@ -386,6 +386,83 @@ const [assignedSelectMode, setAssignedSelectMode] = React.useState(false)
   const [draggingBlock, setDraggingBlock] = React.useState<ScheduleBlockRow | null>(null)
   const [unassignedCollapsed, setUnassignedCollapsed] = React.useState(false)
 
+  const [cellMemoAuthenticated, setCellMemoAuthenticated] = React.useState(false)
+
+  // ERPメニューから開いたタブだけが、親ウィンドウからログイン情報を受け取る
+  React.useEffect(() => {
+    let active = true
+    let attempts = 0
+    const nonce = crypto.randomUUID()
+    let interval: ReturnType<typeof setInterval> | undefined
+
+    const enableMemo = async () => {
+      if (!active) return
+      setCellMemoAuthenticated(true)
+      try {
+        const refreshed = await fetchWeeklyCalendarData(initialBaseDate)
+        if (active) setData(refreshed)
+      } catch (error) {
+        console.error("備考を含む予定表の再取得に失敗:", error)
+      }
+    }
+
+    const requestSession = () => {
+      if (!window.opener || window.opener.closed || attempts >= 8) {
+        if (interval) clearInterval(interval)
+        return
+      }
+      attempts += 1
+      window.opener.postMessage(
+        { type: "printing-schedule:auth-request", nonce },
+        "https://erp.b-p.co.jp",
+      )
+    }
+
+    const receiveSession = async (event: MessageEvent) => {
+      if (event.origin !== "https://erp.b-p.co.jp" || event.source !== window.opener) return
+      if (event.data?.type !== "printing-schedule:auth-response" || event.data.nonce !== nonce) return
+      if (typeof event.data.accessToken !== "string") return
+      if (interval) clearInterval(interval)
+      try {
+        const res = await fetch("/api/schedule/auth/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ accessToken: event.data.accessToken }),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          console.error("ERP認証の引き継ぎに失敗:", err.error ?? res.status)
+          return
+        }
+        await enableMemo()
+      } catch (error) {
+        console.error("ERP認証の引き継ぎに失敗:", error)
+      }
+    }
+
+    window.addEventListener("message", receiveSession)
+    void (async () => {
+      try {
+        const res = await fetch("/api/schedule/auth/session", { cache: "no-store" })
+        if (res.ok && (await res.json()).authenticated) {
+          await enableMemo()
+          return
+        }
+      } catch (error) {
+        console.error("ERPセッションの確認に失敗:", error)
+      }
+      requestSession()
+      interval = setInterval(requestSession, 1500)
+    })()
+
+    return () => {
+      active = false
+      window.removeEventListener("message", receiveSession)
+      if (interval) clearInterval(interval)
+    }
+  }, [initialBaseDate])
+
+
   const isMachineFocused = machineFilter !== "all"
 const scheduleCellGrid = isMachineFocused ? SCHEDULE_CELL_GRID_FOCUSED : SCHEDULE_CELL_GRID
 const scheduleTableMinWidth = isMachineFocused
@@ -1597,6 +1674,7 @@ style={{
                                 date={day.date}
                                 shiftCategory={row.shift_category}
                                 value={cell?.memo ?? ""}
+                                enabled={cellMemoAuthenticated}
                               />
                             )}
                           </DroppableScheduleCell>
@@ -2305,11 +2383,13 @@ function ScheduleCellMemo({
   date,
   shiftCategory,
   value,
+  enabled,
 }: {
   machineId: string
   date: string
   shiftCategory: "day" | "night"
   value: string
+  enabled: boolean
 }) {
   const [text, setText] = React.useState(value)
   const [saved, setSaved] = React.useState(value)
@@ -2323,7 +2403,7 @@ function ScheduleCellMemo({
   }, [value, machineId, date, shiftCategory])
 
   const save = async () => {
-    if (saving || text === saved) return
+    if (!enabled || saving || text === saved) return
     setSaving(true)
     setError(null)
     try {
@@ -2355,7 +2435,8 @@ function ScheduleCellMemo({
         <textarea
           aria-label={date + " " + shiftCategory + " のセル備考"}
           value={text}
-          placeholder="自由に入力"
+          disabled={!enabled}
+          placeholder={enabled ? "自由に入力" : "ERPのメニューから開くと編集できます"}
           rows={1}
           maxLength={2000}
           onChange={(event) => setText(event.target.value)}
@@ -2365,6 +2446,7 @@ function ScheduleCellMemo({
         />
         {error ? <p className="mt-1 text-red-600">{error}（再度フォーカスを外すと再保存できます）</p> : null}
         {saving ? <p className="mt-1 text-slate-500">保存中…</p> : null}
+        {!enabled ? <p className="mt-1 text-slate-500">備考の編集にはERPでのログインが必要です</p> : null}
       </div>
     </div>
   )
