@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { getScheduleErpSession } from "@/lib/schedule/erp-session"
 import { unstable_noStore as noStore } from "next/cache"
 import type {
   MachineRow,
@@ -80,11 +81,14 @@ export async function getWeeklyCalendarData(baseDate?: string): Promise<WeeklyCa
 })
 
   // 備考は案件が0件のセルにも存在するため、独立したテーブルから取得
-  const { data: memoRows, error: memoError } = await supabase
-    .from("schedule_cell_memos")
-    .select("machine_id, scheduled_date, shift_category, memo")
-    .gte("scheduled_date", startYmd)
-    .lte("scheduled_date", endYmd)
+  const erpSession = await getScheduleErpSession()
+  const { data: memoRows, error: memoError } = erpSession
+    ? await erpSession.client
+        .from("schedule_cell_memos")
+        .select("machine_id, scheduled_date, shift_category, memo")
+        .gte("scheduled_date", startYmd)
+        .lte("scheduled_date", endYmd)
+    : { data: [], error: null }
 
   if (memoError) {
     // SQL未適用の環境では予定表自体は表示できるようにする
