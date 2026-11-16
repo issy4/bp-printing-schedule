@@ -122,6 +122,7 @@ export type WeeklyCalendarCell = {
   shift_category: "day" | "night"
   date: string
   blocks: ScheduleBlockRow[]
+  memo?: string
 }
 
 export type WeeklyCalendarData = {
@@ -1589,6 +1590,15 @@ style={{
                             ) : (
                               <div className="pt-6 text-center text-xs text-muted-foreground">-</div>
                             )}
+                            {!loading && (
+                              <ScheduleCellMemo
+                                key={key}
+                                machineId={row.machine_id}
+                                date={day.date}
+                                shiftCategory={row.shift_category}
+                                value={cell?.memo ?? ""}
+                              />
+                            )}
                           </DroppableScheduleCell>
                         </td>
                       )
@@ -2285,6 +2295,77 @@ function DraggableBlock({
       className={`cursor-grab active:cursor-grabbing ${selected ? "bg-blue-50 ring-2 ring-blue-400" : ""}`}
     >
       {children}
+    </div>
+  )
+}
+
+// 案件ごとの特記ではなく、印刷機×日付×日勤/夜勤ごとの備考
+function ScheduleCellMemo({
+  machineId,
+  date,
+  shiftCategory,
+  value,
+}: {
+  machineId: string
+  date: string
+  shiftCategory: "day" | "night"
+  value: string
+}) {
+  const [text, setText] = React.useState(value)
+  const [saved, setSaved] = React.useState(value)
+  const [saving, setSaving] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    setText(value)
+    setSaved(value)
+    setError(null)
+  }, [value, machineId, date, shiftCategory])
+
+  const save = async () => {
+    if (saving || text === saved) return
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/schedule/cell-memo", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ machineId, date, shiftCategory, memo: text }),
+      })
+      const result = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(result.error ?? "備考を保存できませんでした")
+      setSaved(text)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "備考を保存できませんでした")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      className="flex min-h-[32px] items-start border-t border-slate-300 bg-slate-50 text-[11px]"
+      onClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <label className="w-[58px] shrink-0 border-r border-slate-300 px-2 py-2 font-bold text-slate-700">
+        備考
+      </label>
+      <div className="min-w-0 flex-1 px-1 py-1">
+        <textarea
+          aria-label={date + " " + shiftCategory + " のセル備考"}
+          value={text}
+          placeholder="自由に入力"
+          rows={1}
+          maxLength={2000}
+          onChange={(event) => setText(event.target.value)}
+          onBlur={() => void save()}
+          onKeyDown={(event) => event.stopPropagation()}
+          className="block min-h-[24px] w-full resize-y rounded border border-slate-200 bg-white px-2 py-1 leading-4 outline-none focus:border-blue-400"
+        />
+        {error ? <p className="mt-1 text-red-600">{error}（再度フォーカスを外すと再保存できます）</p> : null}
+        {saving ? <p className="mt-1 text-slate-500">保存中…</p> : null}
+      </div>
     </div>
   )
 }
