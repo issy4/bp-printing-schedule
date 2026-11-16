@@ -89,6 +89,7 @@ export type WeeklyCalendarCell = {
   shift_category: "day" | "night"
   date: string
   blocks: ScheduleBlockRow[]
+  memo?: string
 }
 
 export type WeeklyCalendarData = {
