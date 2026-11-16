@@ -122,6 +122,7 @@ export type WeeklyCalendarCell = {
   shift_category: "day" | "night"
   date: string
   blocks: ScheduleBlockRow[]
+  memo?: string
 }
 
 export type WeeklyCalendarData = {
@@ -164,6 +165,21 @@ type ScheduleCellDropData = {
 
 type UnassignedDropData = {
   type: "unassigned-area"
+}
+
+const ERP_ORIGIN = process.env.NEXT_PUBLIC_ERP_ORIGIN || "https://erp.b-p.co.jp"
+
+// Vercel Previewは新しいコミットごとにURLが変わる。
+// ERP本番・Previewブランチの固定エイリアス・同一プロジェクトのPreviewデプロイのみ許可する。
+function isAllowedErpOrigin(origin: string) {
+  if (origin === "https://erp.b-p.co.jp" || origin === ERP_ORIGIN) return true
+  try {
+    const url = new URL(origin)
+    return url.protocol === "https:" &&
+      /^mqdriven-[a-z0-9]+-bp-5f70f10d\.vercel\.app$/.test(url.hostname)
+  } catch {
+    return false
+  }
 }
 
 const SCHEDULE_CELL_GRID =
@@ -384,6 +400,117 @@ const [assignedSelectMode, setAssignedSelectMode] = React.useState(false)
 
   const [draggingBlock, setDraggingBlock] = React.useState<ScheduleBlockRow | null>(null)
   const [unassignedCollapsed, setUnassignedCollapsed] = React.useState(false)
+
+  const [cellMemoAuthenticated, setCellMemoAuthenticated] = React.useState(false)
+  const [erpAuthStatus, setErpAuthStatus] = React.useState("ERP認証を確認しています…")
+
+  // ERPメニューから開いたタブだけが、親ウィンドウからログイン情報を受け取る
+  React.useEffect(() => {
+    let active = true
+    let attempts = 0
+    let receivedResponse = false
+    const nonce = crypto.randomUUID()
+    let interval: ReturnType<typeof setInterval> | undefined
+
+    const enableMemo = async () => {
+      if (!active) return
+      setCellMemoAuthenticated(true)
+      setErpAuthStatus("ERPログイン確認済み・備考を編集できます")
+      try {
+        const refreshed = await fetchWeeklyCalendarData(initialBaseDate)
+        if (active) setData(refreshed)
+      } catch (error) {
+        console.error("備考を含む予定表の再取得に失敗:", error)
+      }
+    }
+
+    const requestSession = () => {
+      if (!window.opener || window.opener.closed) {
+        setErpAuthStatus("ERPとタブ間接続できません。ERPの製造メニューから開き直してください")
+        if (interval) clearInterval(interval)
+        return
+      }
+      if (attempts >= 8) {
+        if (!receivedResponse) setErpAuthStatus("ERPから応答がありません。タブ間通信を確認してください")
+        if (interval) clearInterval(interval)
+        return
+      }
+      attempts += 1
+      // ここで送るのは使い捨てnonceだけ（認証情報は含まない）。
+      // 親ERPの実際のPreview URLが異なる場合も、拒否理由を受け取れるようにする。
+      window.opener.postMessage(
+        { type: "printing-schedule:auth-request", nonce },
+        "*",
+      )
+    }
+
+    const receiveSession = async (event: MessageEvent) => {
+      if (event.source !== window.opener || event.data?.nonce !== nonce) return
+      if (!isAllowedErpOrigin(event.origin)) {
+        // 想定外の送信元からは、認証情報を受け取らない
+        receivedResponse = true
+        setErpAuthStatus(`ERPの送信元を確認できません：${event.origin}`)
+        if (interval) clearInterval(interval)
+        return
+      }
+      if (event.data?.type === "printing-schedule:auth-error") {
+        receivedResponse = true
+        const message = event.data.message
+        setErpAuthStatus(message === "no-session"
+          ? "ERP側の有効なログインが確認できません"
+          : message === "origin-mismatch"
+          ? `印刷スケジュールのURLがERPの許可先と一致しません。ERPの設定: ${String(event.data.expected ?? "-")} / この画面: ${window.location.origin}`
+          : "ERP側の認証取得でエラーが発生しました")
+        if (interval) clearInterval(interval)
+        return
+      }
+      if (event.data?.type !== "printing-schedule:auth-response") return
+      if (typeof event.data.accessToken !== "string") return
+      receivedResponse = true
+      setErpAuthStatus("ERP認証情報を受信・検証中…")
+      if (interval) clearInterval(interval)
+      try {
+        const res = await fetch("/api/schedule/auth/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ accessToken: event.data.accessToken }),
+        })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          console.error("ERP認証の引き継ぎに失敗:", err.error ?? res.status)
+          setErpAuthStatus(`認証検証エラー HTTP ${res.status}：${String(err.error ?? "不明")}`)
+          return
+        }
+        await enableMemo()
+      } catch (error) {
+        console.error("ERP認証の引き継ぎに失敗:", error)
+        setErpAuthStatus("ERP認証通信エラー")
+      }
+    }
+
+    window.addEventListener("message", receiveSession)
+    void (async () => {
+      try {
+        const res = await fetch("/api/schedule/auth/session", { cache: "no-store" })
+        if (res.ok && (await res.json()).authenticated) {
+          await enableMemo()
+          return
+        }
+      } catch (error) {
+        console.error("ERPセッションの確認に失敗:", error)
+      }
+      setErpAuthStatus("ERPのログイン情報を受信しています…")
+      requestSession()
+      interval = setInterval(requestSession, 1500)
+    })()
+
+    return () => {
+      active = false
+      window.removeEventListener("message", receiveSession)
+      if (interval) clearInterval(interval)
+    }
+  }, [initialBaseDate])
+
 
   const isMachineFocused = machineFilter !== "all"
 const scheduleCellGrid = isMachineFocused ? SCHEDULE_CELL_GRID_FOCUSED : SCHEDULE_CELL_GRID
@@ -1354,6 +1481,9 @@ async function handleCancelSelectedUnassignedBlocks() {
 </DroppableUnassignedArea>
 
         <section className="flex min-w-0 flex-col overflow-hidden">
+          <div role="status" className={`border-b px-3 py-1 text-[11px] ${cellMemoAuthenticated ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}`}>
+            備考編集の認証状態：{erpAuthStatus}
+          </div>
           <div className="flex items-center justify-between gap-3 border-b p-3">
             <div className="flex items-center gap-2">
               <Button variant="outline" size="icon" onClick={() => goWeek(-1)}>
@@ -1588,6 +1718,16 @@ style={{
                               </>
                             ) : (
                               <div className="pt-6 text-center text-xs text-muted-foreground">-</div>
+                            )}
+                            {!loading && (
+                              <ScheduleCellMemo
+                                key={key}
+                                machineId={row.machine_id}
+                                date={day.date}
+                                shiftCategory={row.shift_category}
+                                value={cell?.memo ?? ""}
+                                enabled={cellMemoAuthenticated}
+                              />
                             )}
                           </DroppableScheduleCell>
                         </td>
@@ -2285,6 +2425,81 @@ function DraggableBlock({
       className={`cursor-grab active:cursor-grabbing ${selected ? "bg-blue-50 ring-2 ring-blue-400" : ""}`}
     >
       {children}
+    </div>
+  )
+}
+
+// 案件ごとの特記ではなく、印刷機×日付×日勤/夜勤ごとの備考
+function ScheduleCellMemo({
+  machineId,
+  date,
+  shiftCategory,
+  value,
+  enabled,
+}: {
+  machineId: string
+  date: string
+  shiftCategory: "day" | "night"
+  value: string
+  enabled: boolean
+}) {
+  const [text, setText] = React.useState(value)
+  const [saved, setSaved] = React.useState(value)
+  const [saving, setSaving] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    setText(value)
+    setSaved(value)
+    setError(null)
+  }, [value, machineId, date, shiftCategory])
+
+  const save = async () => {
+    if (!enabled || saving || text === saved) return
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/schedule/cell-memo", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ machineId, date, shiftCategory, memo: text }),
+      })
+      const result = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(result.error ?? "備考を保存できませんでした")
+      setSaved(text)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "備考を保存できませんでした")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      className="flex min-h-[32px] items-start border-t border-slate-300 bg-slate-50 text-[11px]"
+      onClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <label className="w-[58px] shrink-0 border-r border-slate-300 px-2 py-2 font-bold text-slate-700">
+        備考
+      </label>
+      <div className="min-w-0 flex-1 px-1 py-1">
+        <textarea
+          aria-label={date + " " + shiftCategory + " のセル備考"}
+          value={text}
+          disabled={!enabled}
+          placeholder={enabled ? "自由に入力" : "ERPのメニューから開くと編集できます"}
+          rows={1}
+          maxLength={2000}
+          onChange={(event) => setText(event.target.value)}
+          onBlur={() => void save()}
+          onKeyDown={(event) => event.stopPropagation()}
+          className="block min-h-[24px] w-full resize-y rounded border border-slate-200 bg-white px-2 py-1 leading-4 outline-none focus:border-blue-400"
+        />
+        {error ? <p className="mt-1 text-red-600">{error}（再度フォーカスを外すと再保存できます）</p> : null}
+        {saving ? <p className="mt-1 text-slate-500">保存中…</p> : null}
+        {!enabled ? <p className="mt-1 text-slate-500">備考の編集にはERPでのログインが必要です</p> : null}
+      </div>
     </div>
   )
 }
