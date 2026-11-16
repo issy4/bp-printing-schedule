@@ -79,6 +79,18 @@ export async function getWeeklyCalendarData(baseDate?: string): Promise<WeeklyCa
   firstWeekRow: weekRows?.[0],
 })
 
+  // 備考は案件が0件のセルにも存在するため、独立したテーブルから取得
+  const { data: memoRows, error: memoError } = await supabase
+    .from("schedule_cell_memos")
+    .select("machine_id, scheduled_date, shift_category, memo")
+    .gte("scheduled_date", startYmd)
+    .lte("scheduled_date", endYmd)
+
+  if (memoError) {
+    // SQL未適用の環境では予定表自体は表示できるようにする
+    console.error("セル備考の取得に失敗しました:", memoError.message)
+  }
+
   const typedWeekRows = (weekRows ?? []) as ScheduleBlockRow[]
   const typedUnassignedRows = (unassignedRows ?? []) as ScheduleBlockRow[]
 
@@ -141,6 +153,13 @@ export async function getWeeklyCalendarData(baseDate?: string): Promise<WeeklyCa
     }
 
     cells[key].blocks.push(row)
+  }
+
+  for (const row of memoRows ?? []) {
+    const key = makeCellKey(row.machine_id, row.shift_category, row.scheduled_date)
+    if (cells[key]) {
+      cells[key].memo = row.memo ?? ""
+    }
   }
 
   for (const key of Object.keys(cells)) {
