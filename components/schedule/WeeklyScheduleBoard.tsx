@@ -169,6 +169,19 @@ type UnassignedDropData = {
 
 const ERP_ORIGIN = process.env.NEXT_PUBLIC_ERP_ORIGIN || "https://erp.b-p.co.jp"
 
+// Vercel Previewは新しいコミットごとにURLが変わる。
+// ERP本番・Previewブランチの固定エイリアス・同一プロジェクトのPreviewデプロイのみ許可する。
+function isAllowedErpOrigin(origin: string) {
+  if (origin === "https://erp.b-p.co.jp" || origin === ERP_ORIGIN) return true
+  try {
+    const url = new URL(origin)
+    return url.protocol === "https:" &&
+      /^mqdriven-[a-z0-9]+-bp-5f70f10d\.vercel\.app$/.test(url.hostname)
+  } catch {
+    return false
+  }
+}
+
 const SCHEDULE_CELL_GRID =
   "grid-cols-[44px_72px_240px_34px_34px_34px_34px_120px_58px_52px_90px_34px_72px_90px_90px_34px]"
 
@@ -433,10 +446,10 @@ const [assignedSelectMode, setAssignedSelectMode] = React.useState(false)
 
     const receiveSession = async (event: MessageEvent) => {
       if (event.source !== window.opener || event.data?.nonce !== nonce) return
-      if (event.origin !== ERP_ORIGIN) {
-        // 想定外の送信元から受け取ったトークンを利用しない
+      if (!isAllowedErpOrigin(event.origin)) {
+        // 想定外の送信元からは、認証情報を受け取らない
         receivedResponse = true
-        setErpAuthStatus(`ERPのURLが一致しません。実際: ${event.origin} / 設定: ${ERP_ORIGIN}`)
+        setErpAuthStatus(`ERPの送信元を確認できません：${event.origin}`)
         if (interval) clearInterval(interval)
         return
       }
