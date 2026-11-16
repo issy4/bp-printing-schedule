@@ -167,6 +167,8 @@ type UnassignedDropData = {
   type: "unassigned-area"
 }
 
+const ERP_ORIGIN = process.env.NEXT_PUBLIC_ERP_ORIGIN || "https://erp.b-p.co.jp"
+
 const SCHEDULE_CELL_GRID =
   "grid-cols-[44px_72px_240px_34px_34px_34px_34px_120px_58px_52px_90px_34px_72px_90px_90px_34px]"
 
@@ -414,12 +416,12 @@ const [assignedSelectMode, setAssignedSelectMode] = React.useState(false)
       attempts += 1
       window.opener.postMessage(
         { type: "printing-schedule:auth-request", nonce },
-        "https://erp.b-p.co.jp",
+        ERP_ORIGIN,
       )
     }
 
     const receiveSession = async (event: MessageEvent) => {
-      if (event.origin !== "https://erp.b-p.co.jp" || event.source !== window.opener) return
+      if (event.origin !== ERP_ORIGIN || event.source !== window.opener) return
       if (event.data?.type !== "printing-schedule:auth-response" || event.data.nonce !== nonce) return
       if (typeof event.data.accessToken !== "string") return
       if (interval) clearInterval(interval)
