@@ -9,7 +9,10 @@ function sameOrigin(request: NextRequest) {
 
 export async function GET() {
   const session = await getScheduleErpSession()
-  return NextResponse.json({ authenticated: !!session })
+  return NextResponse.json(
+    { authenticated: !!session },
+    { headers: { "Cache-Control": "no-store" } },
+  )
 }
 
 export async function POST(request: NextRequest) {
