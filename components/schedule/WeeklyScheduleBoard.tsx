@@ -372,6 +372,23 @@ async function fetchWeeklyCalendarData(baseDate?: string): Promise<WeeklyCalenda
   return res.json()
 }
 
+type CrossScheduleSearchScope = "all" | "unassigned" | "assigned"
+
+type CrossScheduleSearchResult = {
+  block_id: string
+  order_number: string | null
+  product_name: string | null
+  customer_name: string | null
+  part_name: string | null
+  unit_name: string | null
+  plate_size: string | null
+  scheduled_date: string | null
+  machine_id: string | null
+  machine_name: string | null
+  shift_category: "day" | "night" | null
+  block_status: string
+}
+
 export default function WeeklyScheduleBoard({
   initialData,
   initialBaseDate,
@@ -385,6 +402,14 @@ export default function WeeklyScheduleBoard({
   const [loading, setLoading] = React.useState(!initialData)
   const [error, setError] = React.useState<string | null>(null)
   const [query, setQuery] = React.useState("")
+  const [allSearchQuery, setAllSearchQuery] = React.useState("")
+  const [allSearchScope, setAllSearchScope] = React.useState<CrossScheduleSearchScope>("all")
+  const [allSearchResults, setAllSearchResults] = React.useState<CrossScheduleSearchResult[]>([])
+  const [allSearchOpen, setAllSearchOpen] = React.useState(false)
+  const [allSearchLoading, setAllSearchLoading] = React.useState(false)
+  const [allSearchError, setAllSearchError] = React.useState<string | null>(null)
+  const [allSearchHasMore, setAllSearchHasMore] = React.useState(false)
+  const [highlightedBlockId, setHighlightedBlockId] = React.useState<string | null>(null)
   const [showUnassignedOnly, setShowUnassignedOnly] = React.useState(true)
   const [machineFilter, setMachineFilter] = React.useState<string>("all")
   const [selectedBlock, setSelectedBlock] = React.useState<ScheduleBlockRow | null>(null)
@@ -511,6 +536,51 @@ const [assignedSelectMode, setAssignedSelectMode] = React.useState(false)
     }
   }, [initialBaseDate])
 
+
+  // 入力中のリクエストを破棄し、入力停止後に週をまたぐ検索を行う
+  React.useEffect(() => {
+    const q = allSearchQuery.trim()
+    if (q.length < 2) {
+      setAllSearchResults([])
+      setAllSearchHasMore(false)
+      setAllSearchError(null)
+      setAllSearchLoading(false)
+      return
+    }
+
+    let disposed = false
+    const controller = new AbortController()
+    setAllSearchLoading(true)
+    setAllSearchError(null)
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ q, scope: allSearchScope })
+        const response = await fetch(`/api/schedule/search?${params.toString()}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        })
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(payload.error ?? "検索に失敗しました")
+        if (disposed) return
+        setAllSearchResults((payload.results ?? []) as CrossScheduleSearchResult[])
+        setAllSearchHasMore(!!payload.hasMore)
+      } catch (error) {
+        if (disposed || controller.signal.aborted) return
+        setAllSearchResults([])
+        setAllSearchHasMore(false)
+        setAllSearchError(error instanceof Error ? error.message : "検索に失敗しました")
+      } finally {
+        if (!disposed) setAllSearchLoading(false)
+      }
+    }, 400)
+
+    return () => {
+      disposed = true
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [allSearchQuery, allSearchScope])
 
   const isMachineFocused = machineFilter !== "all"
 const scheduleCellGrid = isMachineFocused ? SCHEDULE_CELL_GRID_FOCUSED : SCHEDULE_CELL_GRID
@@ -698,7 +768,42 @@ function clearAssignedSelection() {
     })
   }, [data.weekDays, today, dayColumnWidthPx])
 
+  function handleAllSearchResultClick(item: CrossScheduleSearchResult) {
+    setAllSearchOpen(false)
+    setHighlightedBlockId(item.block_id)
+    if (
+      item.block_status === "unassigned" ||
+      !item.scheduled_date ||
+      !item.machine_id
+    ) {
+      // 未割当は左側リストの絞り込みと位置表示へ
+      setUnassignedCollapsed(false)
+      setShowUnassignedOnly(true)
+      setQuery(item.order_number ?? item.product_name ?? item.part_name ?? "")
+      return
+    }
+
+    // 割当済みは日付と印刷機を選び、その週のセルを表示
+    const date = item.scheduled_date.slice(0, 10)
+    setMachineFilter(item.machine_id)
+    setBaseDate(date)
+    void loadData(date)
+  }
+
+  // 週のデータが描画された後、検索した案件の位置へスクロール
+  React.useEffect(() => {
+    if (!highlightedBlockId) return
+    const timer = window.setTimeout(() => {
+      const el = document.querySelector<HTMLElement>(
+        `[data-search-block-id="${highlightedBlockId}"]`,
+      )
+      el?.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" })
+    }, 120)
+    return () => window.clearTimeout(timer)
+  }, [highlightedBlockId, data, machineFilter, unassignedCollapsed, query])
+
   const goWeek = (direction: -1 | 1) => {
+    setHighlightedBlockId(null)
     const base = new Date(baseDate)
     base.setDate(base.getDate() + direction * 7)
     const next = formatYmd(base)
@@ -707,6 +812,7 @@ function clearAssignedSelection() {
   }
 
   const goCurrentWeek = () => {
+    setHighlightedBlockId(null)
     const next = formatYmd(new Date())
     setBaseDate(next)
     void loadData(next)
@@ -1463,12 +1569,12 @@ async function handleCancelSelectedUnassignedBlocks() {
                 key={item.block_id}
                 block={item}
                 source="unassigned"
-                selected={selectedUnassignedBlockIds.has(item.block_id)}
+                selected={selectedUnassignedBlockIds.has(item.block_id) || highlightedBlockId === item.block_id}
                 onSelect={() => toggleUnassignedSelection(item)}
               >
                 <UnassignedBlockCard
                   item={item}
-                  selected={selectedUnassignedBlockIds.has(item.block_id)}
+                  selected={selectedUnassignedBlockIds.has(item.block_id) || highlightedBlockId === item.block_id}
                   onCancel={() => handleCancelUnassignedBlock(item)}
                 />
               </DraggableBlock>
@@ -1544,6 +1650,111 @@ async function handleCancelSelectedUnassignedBlocks() {
               </Button>
             </div>
           </div>
+
+          {/* 左側の未割当検索とは独立した、週をまたぐ全案件検索 */}
+          <div className="flex flex-wrap items-center gap-3 border-b bg-slate-50 px-3 py-2">
+            <div className="relative min-w-[240px] flex-1 max-w-[550px]">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Input
+                aria-label="全案件検索"
+                value={allSearchQuery}
+                onChange={(event) => {
+                  setAllSearchQuery(event.target.value)
+                  setAllSearchOpen(true)
+                }}
+                onFocus={() => setAllSearchOpen(true)}
+                placeholder="全案件検索：受注番号・品名・得意先・部品など"
+                className="h-9 bg-white pl-9"
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-1" role="group" aria-label="検索対象">
+              {([
+                ["all", "すべて"],
+                ["unassigned", "未割当"],
+                ["assigned", "割当済み"],
+              ] as const).map(([scope, label]) => (
+                <button
+                  key={scope}
+                  type="button"
+                  onClick={() => {
+                    setAllSearchScope(scope)
+                    setAllSearchOpen(true)
+                  }}
+                  className={`rounded-md border px-2 py-1.5 text-xs font-semibold ${
+                    allSearchScope === scope
+                      ? "border-blue-500 bg-blue-100 text-blue-800"
+                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+              {allSearchOpen ? (
+                <button
+                  type="button"
+                  onClick={() => setAllSearchOpen(false)}
+                  className="ml-2 rounded border border-slate-300 bg-white px-2 py-1.5 text-xs hover:bg-slate-100"
+                >
+                  閉じる
+                </button>
+              ) : null}
+            </div>
+          </div>
+
+          {allSearchOpen ? (
+            <div className="border-b bg-white px-3 py-2 text-xs">
+              {allSearchQuery.trim().length < 2 ? (
+                <div className="py-2 text-slate-500">2文字以上入力すると、未割当・割当済み案件を週をまたいで検索します。</div>
+              ) : allSearchLoading ? (
+                <div className="py-2 text-slate-600">検索中…</div>
+              ) : allSearchError ? (
+                <div className="py-2 text-red-600">{allSearchError}</div>
+              ) : allSearchResults.length === 0 ? (
+                <div className="py-2 text-slate-500">該当する案件が見つかりませんでした。</div>
+              ) : (
+                <>
+                  <div className="mb-2 text-slate-600">
+                    {allSearchResults.length}件表示
+                    {allSearchHasMore ? "（ほかにも該当があります。検索語を絞ってください）" : ""}
+                    <span className="ml-2">案件を押すと該当位置へ移動します。</span>
+                  </div>
+                  <div className="max-h-[300px] overflow-y-auto rounded border border-slate-200">
+                    {allSearchResults.map((item) => {
+                      const isUnassigned =
+                        item.block_status === "unassigned" ||
+                        !item.scheduled_date ||
+                        !item.machine_id
+                      return (
+                        <button
+                          key={item.block_id}
+                          type="button"
+                          onClick={() => handleAllSearchResultClick(item)}
+                          className="block w-full border-b border-slate-200 px-3 py-2 text-left last:border-0 hover:bg-blue-50 focus:bg-blue-50 focus:outline-none"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="font-bold text-slate-900">
+                              {item.order_number ?? "番号なし"}　{item.product_name ?? "-"}
+                            </span>
+                            <span className={`rounded px-2 py-0.5 font-semibold ${
+                              isUnassigned ? "bg-orange-100 text-orange-800" : "bg-blue-100 text-blue-800"
+                            }`}>
+                              {isUnassigned
+                                ? "未割当"
+                                : `${item.scheduled_date?.slice(0, 10)} ／ ${item.machine_name ?? "印刷機不明"} ／ ${item.shift_category === "night" ? "夜勤" : "日勤"}`}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-slate-600">
+                            {item.part_name ?? item.unit_name ?? "-"}
+                            {item.customer_name ? ` ／ ${item.customer_name}` : ""}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : null}
 
           {error ? <div className="p-4 text-sm text-red-600">{error}</div> : null}
 
@@ -1694,7 +1905,7 @@ style={{
           block={block}
           gridClass={scheduleCellGrid}
           focused={isMachineFocused}
-          selected={selectedAssignedBlockIds.has(block.block_id)}
+          selected={selectedAssignedBlockIds.has(block.block_id) || highlightedBlockId === block.block_id}
           canMoveUp={isSameScheduleGroup(block, sortedBlocks[index - 1])}
           canMoveDown={isSameScheduleGroup(block, sortedBlocks[index + 1])}
           onMoveUp={() => handleMoveBlockOrder(block, "up")}
@@ -2415,6 +2626,7 @@ function DraggableBlock({
   return (
     <div
       ref={setNodeRef}
+      data-search-block-id={block.block_id}
       style={style}
       {...listeners}
       {...attributes}
