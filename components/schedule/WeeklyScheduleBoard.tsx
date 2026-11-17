@@ -2447,6 +2447,28 @@ function ScheduleCellMemo({
   const [saved, setSaved] = React.useState(value)
   const [saving, setSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const textareaRef = React.useRef<HTMLTextAreaElement | null>(null)
+
+  // 初回表示・再読み込み・入力中のいずれも、全行が見える高さにする
+  const resizeMemo = React.useCallback(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = "auto"
+    el.style.height = `${Math.max(28, el.scrollHeight)}px`
+  }, [])
+
+  React.useLayoutEffect(() => {
+    resizeMemo()
+  }, [text, resizeMemo])
+
+  // 印刷機フィルタ等で列幅が変わると改行数が変化するため、幅変更にも追従
+  React.useEffect(() => {
+    const container = textareaRef.current?.parentElement
+    if (!container || typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(() => resizeMemo())
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [resizeMemo])
 
   React.useEffect(() => {
     setText(value)
@@ -2485,6 +2507,7 @@ function ScheduleCellMemo({
       </label>
       <div className="min-w-0 flex-1 px-1 py-1">
         <textarea
+          ref={textareaRef}
           aria-label={date + " " + shiftCategory + " のセル備考"}
           value={text}
           disabled={!enabled}
@@ -2494,7 +2517,7 @@ function ScheduleCellMemo({
           onChange={(event) => setText(event.target.value)}
           onBlur={() => void save()}
           onKeyDown={(event) => event.stopPropagation()}
-          className="block min-h-[24px] w-full resize-y rounded border border-slate-200 bg-white px-2 py-1 leading-4 outline-none focus:border-blue-400"
+          className="block min-h-[28px] w-full resize-none overflow-hidden rounded border border-slate-200 bg-white px-2 py-1 leading-4 outline-none focus:border-blue-400"
         />
         {error ? <p className="mt-1 text-red-600">{error}（再度フォーカスを外すと再保存できます）</p> : null}
         {saving ? <p className="mt-1 text-slate-500">保存中…</p> : null}
