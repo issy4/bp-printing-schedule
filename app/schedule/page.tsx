@@ -1,5 +1,5 @@
 import WeeklyScheduleBoard from "@/components/schedule/WeeklyScheduleBoard"
-import ScheduleAuthBridge from "@/components/schedule/ScheduleAuthBridge"
+import ScheduleAuthBridge, { ScheduleSessionGuard } from "@/components/schedule/ScheduleAuthBridge"
 import { getWeeklyCalendarData } from "@/lib/schedule/get-weekly-calendar-data"
 import { getScheduleErpSession } from "@/lib/schedule/erp-session"
 
@@ -21,8 +21,10 @@ export default async function SchedulePage() {
   const data = await getWeeklyCalendarData(baseDate)
 
   return (
-    <div className="p-4">
-      <WeeklyScheduleBoard initialData={data} initialBaseDate={baseDate} />
-    </div>
+    <ScheduleSessionGuard>
+      <div className="p-4">
+        <WeeklyScheduleBoard initialData={data} initialBaseDate={baseDate} />
+      </div>
+    </ScheduleSessionGuard>
   )
 }
