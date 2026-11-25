@@ -39,3 +39,21 @@ export async function POST(request: NextRequest) {
   })
   return NextResponse.json({ authenticated: true })
 }
+
+
+// ブラウザ側のERP認証が解除されたとき、スケジュール専用Cookieも破棄する。
+export async function DELETE(request: NextRequest) {
+  if (!sameOrigin(request)) {
+    return NextResponse.json({ error: "不正なアクセス元です" }, { status: 403 })
+  }
+  ;(await cookies()).set(ERP_SESSION_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  })
+  return NextResponse.json({ authenticated: false }, {
+    headers: { "Cache-Control": "no-store" },
+  })
+}
