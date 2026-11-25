@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireScheduleApiSession } from "@/lib/schedule/require-api-session"
 import { getWeeklyCalendarData } from "@/lib/schedule/get-weekly-calendar-data"
 
 export async function GET(request: NextRequest) {
+  const auth = await requireScheduleApiSession(request)
+  if (!auth.ok) return auth.response
   const date = request.nextUrl.searchParams.get("date") ?? undefined
 
   try {
-    const data = await getWeeklyCalendarData(date)
-    return NextResponse.json(data)
+    const data = await getWeeklyCalendarData(date, auth.session.client)
+    return NextResponse.json(data, { headers: { "Cache-Control": "no-store" } })
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "週間予定データの取得に失敗しました"

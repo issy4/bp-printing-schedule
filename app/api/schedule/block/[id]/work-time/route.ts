@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { requireScheduleApiSession } from "@/lib/schedule/require-api-session"
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const auth = await requireScheduleApiSession(request)
+  if (!auth.ok) return auth.response
   const { id } = await params
   const body = await request.json()
   const action = body.action as "start" | "stop" | "clear" | undefined
@@ -16,7 +18,7 @@ export async function PATCH(
     )
   }
 
-  const supabase = await createClient()
+  const supabase = auth.session.client
 
   if (action === "start") {
     const now = new Date().toISOString()

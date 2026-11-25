@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from "next/server"
-import { getScheduleErpSession } from "@/lib/schedule/erp-session"
+import { requireScheduleApiSession } from "@/lib/schedule/require-api-session"
 
 type Params = {
   params: Promise<{
@@ -52,36 +52,9 @@ export async function PATCH(
   { params }: Params,
 ) {
   try {
-    // 1. アクセス元の確認
-    if (
-      request.headers.get("origin") !==
-      new URL(request.url).origin
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "不正なアクセス元です",
-        },
-        { status: 403 },
-      )
-    }
-
-    // 2. ERPセッション認証
-    const session = await getScheduleErpSession()
-
-    if (!session) {
-      return NextResponse.json(
-        {
-          success: false,
-          error:
-            "ERPから開き直してください（認証期限切れ）",
-        },
-        { status: 401 },
-      )
-    }
-
-    // 検証済みのERP認証トークンを使用
-    const supabase = session.client
+    const auth = await requireScheduleApiSession(request)
+    if (!auth.ok) return auth.response
+    const supabase = auth.session.client
 
     // 3. 更新対象IDの取得
     const { id } = await params

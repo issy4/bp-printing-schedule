@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { requireScheduleApiSession } from "@/lib/schedule/require-api-session"
 
 type ImportItem = {
   part_name: string
@@ -22,9 +22,11 @@ type ImportBody = {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireScheduleApiSession(request)
+  if (!auth.ok) return auth.response
   try {
     const body = (await request.json()) as ImportBody
-    const supabase = await createClient()
+    const supabase = auth.session.client
 
     if (!body.order_entry_id) {
       return NextResponse.json(

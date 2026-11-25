@@ -18,7 +18,7 @@ export default async function SchedulePage() {
   }
 
   const baseDate = getTodayString()
-  const data = await getWeeklyCalendarData(baseDate)
+  const data = await getWeeklyCalendarData(baseDate, session.client)
 
   return (
     <ScheduleSessionGuard>
