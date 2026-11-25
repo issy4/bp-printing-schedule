@@ -1,45 +1,28 @@
-
 import WeeklyScheduleBoard from "@/components/schedule/WeeklyScheduleBoard"
+import ScheduleAuthBridge from "@/components/schedule/ScheduleAuthBridge"
 import { getWeeklyCalendarData } from "@/lib/schedule/get-weekly-calendar-data"
 import { getScheduleErpSession } from "@/lib/schedule/erp-session"
 
-// 今日の日付を YYYY-MM-DD 形式で取得
+// 現行の週表示の日付計算を維持
 function getTodayString() {
   const today = new Date()
   return today.toISOString().split("T")[0]
 }
 
 export default async function SchedulePage() {
-  // ERPの認証セッションを確認
   const session = await getScheduleErpSession()
 
-  // 未認証の場合は印刷予定を取得しない
+  // 認証前はデータを取得・描画せず、ERPからの認証受け渡しのみ行う
   if (!session) {
-    return (
-      <main className="p-6">
-        <h1 className="text-xl font-bold mb-4">
-          ERP認証が必要です
-        </h1>
-
-        <p className="text-gray-600">
-          印刷スケジュールを表示するには、
-          ERPにログインしてから開き直してください。
-        </p>
-      </main>
-    )
+    return <ScheduleAuthBridge />
   }
 
-  // 認証済みの場合のみ印刷予定を取得
   const baseDate = getTodayString()
-
   const data = await getWeeklyCalendarData(baseDate)
 
   return (
     <div className="p-4">
-      <WeeklyScheduleBoard
-        initialData={data}
-        initialBaseDate={baseDate}
-      />
+      <WeeklyScheduleBoard initialData={data} initialBaseDate={baseDate} />
     </div>
   )
 }
