@@ -8,11 +8,18 @@ function sameOrigin(request: NextRequest) {
 }
 
 export async function GET() {
-  const session = await getScheduleErpSession()
-  return NextResponse.json(
-    { authenticated: !!session },
-    { headers: { "Cache-Control": "no-store" } },
-  )
+  try {
+    const session = await getScheduleErpSession()
+    return NextResponse.json(
+      { authenticated: !!session },
+      { headers: { "Cache-Control": "no-store" } },
+    )
+  } catch {
+    return NextResponse.json(
+      { authenticated: false, error: "ERPの利用権限を確認できません" },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    )
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -23,13 +30,23 @@ export async function POST(request: NextRequest) {
   if (typeof body.accessToken !== "string") {
     return NextResponse.json({ error: "認証情報がありません" }, { status: 400 })
   }
-  // ERPから送られたSupabase Authのトークンを認証サーバーで確認する
-  const verified = await verifyErpAccessToken(body.accessToken)
-  if (!verified) {
-    return NextResponse.json({ error: "ERPログインの確認に失敗しました" }, { status: 401 })
+  // JWT・社員・認証セッションを確認してからCookieを発行する。
+  try {
+    const verified = await verifyErpAccessToken(body.accessToken)
+    if (!verified) {
+      return NextResponse.json(
+        { error: "ERPの有効な社員情報または認証セッションを確認できません" },
+        { status: 401, headers: { "Cache-Control": "no-store" } },
+      )
+    }
+  } catch {
+    return NextResponse.json(
+      { error: "ERPの利用権限を確認できません" },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    )
   }
 
-  // Auth APIがトークンを失効させれば、保存時の再検証で拒否される
+  // 各業務APIでもセッションと社員情報を再検証する。
   (await cookies()).set(ERP_SESSION_COOKIE, body.accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -37,7 +54,7 @@ export async function POST(request: NextRequest) {
     path: "/",
     maxAge: 45 * 60,
   })
-  return NextResponse.json({ authenticated: true })
+  return NextResponse.json({ authenticated: true }, { headers: { "Cache-Control": "no-store" } })
 }
 
 

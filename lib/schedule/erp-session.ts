@@ -21,10 +21,18 @@ export async function verifyErpAccessToken(accessToken: string): Promise<{
 } | null> {
   if (!accessToken || accessToken.length > 5000) return null
   const client = createTokenClient(accessToken)
-  // Authユーザーの検証と、ログアウト済みsession_idの失効確認は別の処理。
-  // auth.sessionsの確認はDB側の権限・RLSを確認してから追加する。
+  // AuthサーバーでJWTを検証し、同じJWTで社員・セッションの現状を確認する。
   const { data, error } = await client.auth.getUser(accessToken)
   if (error || !data.user || data.user.is_anonymous) return null
+
+  const { data: allowed, error: accessError } =
+    await client.rpc("check_printing_schedule_access")
+  if (accessError) {
+    // RPCが利用できない場合もアクセスを許可しない。詳細やJWTは返さない。
+    throw new Error("ERPの利用権限を確認できません")
+  }
+  if (allowed !== true) return null
+
   return { user: data.user, client }
 }
 

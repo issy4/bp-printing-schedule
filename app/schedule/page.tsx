@@ -10,7 +10,17 @@ function getTodayString() {
 }
 
 export default async function SchedulePage() {
-  const session = await getScheduleErpSession()
+  let session: Awaited<ReturnType<typeof getScheduleErpSession>>
+  try {
+    session = await getScheduleErpSession()
+  } catch {
+    return (
+      <main className="p-6">
+        <h1 className="mb-4 text-xl font-bold">ERPの利用権限を確認できません</h1>
+        <p>ERPの製造メニューから開き直してください。</p>
+      </main>
+    )
+  }
 
   // 認証前はデータを取得・描画せず、ERPからの認証受け渡しのみ行う
   if (!session) {
