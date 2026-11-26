@@ -153,6 +153,53 @@ REVOKE ALL ON FUNCTION public.set_schedule_mq_manual(text,bigint)
 GRANT EXECUTE ON FUNCTION public.set_schedule_mq_manual(text,bigint)
   TO authenticated;
 
+
+-- 基幹同期はこのRPCにsourceデータだけ渡す。
+-- UPDATE対象列を明示し、manual_amount/手入力履歴を絶対に上書きしない。
+CREATE OR REPLACE FUNCTION public.upsert_schedule_mq_sources(p_rows jsonb)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $function$
+DECLARE
+  v_count integer;
+BEGIN
+  IF COALESCE(auth.jwt() ->> 'role', '') <> 'service_role' THEN
+    RAISE EXCEPTION 'MQ基幹同期はサービスロールのみ実行できます'
+      USING ERRCODE = '42501';
+  END IF;
+
+  IF jsonb_typeof(p_rows) IS DISTINCT FROM 'array'
+     OR jsonb_array_length(p_rows) > 200 THEN
+    RAISE EXCEPTION 'MQの取込データは200件以下の配列が必要です'
+      USING ERRCODE = '22023';
+  END IF;
+
+  INSERT INTO public.print_schedule_mq (
+    mq_key, source_amount, source_status, source_detail_id, source_synced_at, updated_at
+  )
+  SELECT
+    r.mq_key, r.source_amount, r.source_status, r.source_detail_id, now(), now()
+  FROM jsonb_to_recordset(p_rows) AS r(
+    mq_key text, source_amount bigint, source_status text, source_detail_id bigint
+  )
+  ON CONFLICT (mq_key) DO UPDATE
+    SET source_amount = EXCLUDED.source_amount,
+        source_status = EXCLUDED.source_status,
+        source_detail_id = EXCLUDED.source_detail_id,
+        source_synced_at = EXCLUDED.source_synced_at,
+        updated_at = now();
+
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.upsert_schedule_mq_sources(jsonb)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.upsert_schedule_mq_sources(jsonb) TO service_role;
+
 COMMIT;
 
 -- 確認用（適用後に別実行）
