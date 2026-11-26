@@ -1,7 +1,7 @@
 # 印刷スケジュール MQ機能（導入手順）
 
 ## 仕様
-- 基幹からの初期MQは、採用見積が1件、印刷工程（major_item=68）・部品（medium_item=t_prints.parts）の見積明細が1件、同一受注・部品の親印刷指示が1件、金額が0以上の整数の場合だけ取得。
+- 基幹からの初期MQは、採用見積が1件、印刷工程（major_item=68）・部品（medium_item=t_prints.parts）の見積明細が1件、同一案件・部品の親印刷指示が1件、金額が0以上の整数の場合だけ取得。
 - 金額未一致・明細複数・親重複は自動MQをNULLとし、1台目に手入力する。
 - 基幹の子印刷明細の台数分、MQを繰り返し加算しない。legacy_parent_idごとにlegacy_job_noの先頭1件だけ表示・集計。
 - 日別TOTAL MQは全印刷機・日勤・夜勤を対象とし、フィルタに左右されない。同じMQキーが複数の予定ブロックを持つ場合も、週内で1回だけ集計する。
@@ -34,10 +34,12 @@ GROUP BY mq_key;
 
 ```powershell
 cd C:\sync\sqlserver-to-supabase
-node .\sync-print-mq-from-sqlserver.cjs
+node .\sync-print-mq-from-sqlserver.cjs --dry-run
+# 確認結果が正しい場合にだけ実行:
+node .\sync-print-mq-from-sqlserver.cjs --apply
 ```
 
-想定結果（対象期間が同じ場合）: 388件の親印刷指示のうち、現時点で一意一致した316件が自動MQ候補。ただし同一受注・部品の親印刷指示重複を除外するため実際の自動取込は316件以下となる可能性がある。対象期間中の追加更新でも件数は変わる。明細複数の103947部品168は自動取込せず手入力。
+想定結果（対象期間が同じ場合）: 388件の親印刷指示のうち、現時点で一意一致した316件が自動MQ候補。ただし同一案件・部品の親印刷指示重複を除外するため実際の自動取込は316件以下となる可能性がある。対象期間中の追加更新でも件数は変わる。明細複数の103947部品168は自動取込せず手入力。
 
 7. SQL Editorで基幹取込の確認:
 
@@ -60,7 +62,7 @@ ORDER BY mq_key;
 
 ```bat
 echo [%date% %time%] sync-print-mq start >> "%LOGFILE%"
-node sync-print-mq-from-sqlserver.cjs >> "%LOGFILE%" 2>&1
+node sync-print-mq-from-sqlserver.cjs --apply >> "%LOGFILE%" 2>&1
 if errorlevel 1 (
     echo [%date% %time%] sync-print-mq ERROR (invoices continue) >> "%LOGFILE%"
 ) else (
