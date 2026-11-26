@@ -7,6 +7,12 @@ const { createClient } = require("@supabase/supabase-js")
 
 const MAX_MQ = 999999999999
 const BATCH_SIZE = 100
+const APPLY = process.argv.includes("--apply")
+const EXPECTED_PROJECT = "pkwajxeegidydalcannz"
+if (process.argv.slice(2).some(arg => arg !== "--apply" && arg !== "--dry-run") ||
+    (APPLY && process.argv.includes("--dry-run"))) {
+  throw new Error("引数は --dry-run または --apply のどちらかを指定してください")
+}
 
 const query = `
 WITH parents AS (
@@ -15,12 +21,11 @@ WITH parents AS (
     pr.parts,
     o.project_id,
     o.id AS order_id,
-    COUNT(*) OVER (PARTITION BY o.id, pr.parts) AS same_part_parent_count
+    o.lower_version,
+    COUNT(*) OVER (PARTITION BY o.project_id, pr.parts) AS same_part_parent_count
   FROM dbo.t_prints pr
   INNER JOIN dbo.t_orders o ON o.id = pr.order_id
   WHERE pr.parent_id IS NULL
-    AND o.lower_version >= DATEADD(DAY, -14, CONVERT(date, GETDATE()))
-    AND o.lower_version < DATEADD(DAY, 91, CONVERT(date, GETDATE()))
 ),
 matched AS (
   SELECT
@@ -38,6 +43,8 @@ matched AS (
     ON d.estimate_id = e.id
    AND d.major_item = 68
    AND d.medium_item = p.parts
+  WHERE p.lower_version >= DATEADD(DAY, -14, CONVERT(date, GETDATE()))
+    AND p.lower_version < DATEADD(DAY, 91, CONVERT(date, GETDATE()))
   GROUP BY p.parent_id, p.same_part_parent_count
 )
 SELECT
@@ -81,6 +88,13 @@ async function main() {
     throw new Error(".env.new のSQL Server / Supabase設定が不足しています")
   }
 
+  const target = new URL(process.env.SUPABASE_URL)
+  if (target.protocol !== "https:" || target.hostname !== EXPECTED_PROJECT + ".supabase.co") {
+    throw new Error("ERP本番Supabaseと接続先が一致しないため中断します")
+  }
+  console.log("[MQ] モード: " + (APPLY ? "APPLY（MQ書込）" : "DRY-RUN（参照のみ）"))
+  console.log("[MQ] 対象プロジェクト: " + EXPECTED_PROJECT)
+
   const db = new sql.ConnectionPool({
     user: process.env.SQLSERVER_USER,
     password: process.env.SQLSERVER_PASSWORD,
@@ -122,6 +136,16 @@ async function main() {
         source_detail_id: source_status === "unique" ? Number(r.source_detail_id) : null,
       }
     })
+
+    console.log(`[MQ] 対象: 全${rows.length}件 自動${counters.unique}件 未一致${counters.missing}件 要手入力${counters.ambiguous}件`)
+    for (const key of ["legacy:242706", "legacy:242708", "legacy:242710", "legacy:244917"]) {
+      const r = rows.find(row => row.mq_key === key)
+      console.log("[MQ] 確認対象", key, r ? r.source_status + " amount=" + String(r.source_amount) : "対象期間外または対象なし")
+    }
+    if (!APPLY) {
+      console.log("[MQ] DRY-RUN完了: Supabaseへの書込なし")
+      return
+    }
 
     for (let i = 0; i < rows.length; i += BATCH_SIZE) {
       const batch = rows.slice(i, i + BATCH_SIZE)
