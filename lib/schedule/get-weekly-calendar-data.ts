@@ -85,7 +85,44 @@ export async function getWeeklyCalendarData(baseDate?: string, verifiedClient?: 
     console.error("セル備考の取得に失敗しました:", memoError.message)
   }
 
-  const typedWeekRows = (weekRows ?? []) as ScheduleBlockRow[]
+  let typedWeekRows = (weekRows ?? []) as ScheduleBlockRow[]
+
+  // MQは schedule_blocks ではなく親印刷指示単位。
+  // 別ビューで「基幹の1台目」を判定し、割当行にのみMQを表示する。
+  // SQL導入前でも既存スケジュールの表示を妨げない。
+  const unitIds = [...new Set(typedWeekRows.map((row) => row.print_unit_id).filter(Boolean))]
+  const mqByUnit = new Map<string, {
+    mq_key: string
+    mq_is_first: boolean
+    mq_amount: number | null
+    mq_origin: "source" | "manual" | "missing" | "not_first"
+  }>()
+  let mqReady = true
+  for (let offset = 0; offset < unitIds.length; offset += 100) {
+    const { data: mqRows, error: mqError } = await supabase
+      .from("vw_schedule_unit_mq")
+      .select("print_unit_id, mq_key, mq_is_first, mq_amount, mq_origin")
+      .in("print_unit_id", unitIds.slice(offset, offset + 100))
+    if (mqError) {
+      console.error("MQの取得に失敗しました（MQ未導入の場合はSQL適用が必要）:", mqError.message)
+      mqReady = false
+      break
+    }
+    for (const row of mqRows ?? []) {
+      mqByUnit.set(row.print_unit_id, {
+        mq_key: row.mq_key,
+        mq_is_first: row.mq_is_first,
+        mq_amount: row.mq_amount === null ? null : Number(row.mq_amount),
+        mq_origin: row.mq_origin,
+      })
+    }
+  }
+  if (mqReady) {
+    typedWeekRows = typedWeekRows.map((row) => ({
+      ...row,
+      ...mqByUnit.get(row.print_unit_id),
+    }))
+  }
   const typedUnassignedRows = (unassignedRows ?? []) as ScheduleBlockRow[]
 
   const machineRows: MachineRow[] = (machines ?? []).flatMap((m) => {
