@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { requireScheduleApiSession } from "@/lib/schedule/require-api-session"
 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireScheduleApiSession(request)
+  if (!auth.ok) return auth.response
   const { id } = await params
-  const supabase = await createClient()
+  const supabase = auth.session.client
 
   const { data, error } = await supabase
     .from("schedule_blocks")

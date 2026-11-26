@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import type { SupabaseClient } from "@supabase/supabase-js"
 import { getScheduleErpSession } from "@/lib/schedule/erp-session"
 import { unstable_noStore as noStore } from "next/cache"
 import type {
@@ -26,9 +26,10 @@ function getShiftLabel(shift: "day" | "night"): "日勤" | "夜勤" {
   return shift === "night" ? "夜勤" : "日勤"
 }
 
-export async function getWeeklyCalendarData(baseDate?: string): Promise<WeeklyCalendarData> {
+export async function getWeeklyCalendarData(baseDate?: string, verifiedClient?: SupabaseClient): Promise<WeeklyCalendarData> {
   noStore()
-  const supabase = await createClient()
+  const supabase = verifiedClient ?? (await getScheduleErpSession())?.client
+  if (!supabase) throw new Error("ERP認証が必要です")
   const { start, startYmd, endYmd } = getWeekRange(baseDate)
   const weekDays = buildWeekDays(start)
 
@@ -71,24 +72,13 @@ export async function getWeeklyCalendarData(baseDate?: string): Promise<WeeklyCa
     throw new Error(`印刷機マスタの取得に失敗しました: ${machinesError.message}`)
   }
 
-  console.log("schedule debug", {
-  startYmd,
-  endYmd,
-  weekRowsCount: weekRows?.length ?? 0,
-  unassignedRowsCount: unassignedRows?.length ?? 0,
-  machinesCount: machines?.length ?? 0,
-  firstWeekRow: weekRows?.[0],
-})
 
   // 備考は案件が0件のセルにも存在するため、独立したテーブルから取得
-  const erpSession = await getScheduleErpSession()
-  const { data: memoRows, error: memoError } = erpSession
-    ? await erpSession.client
+  const { data: memoRows, error: memoError } = await supabase
         .from("schedule_cell_memos")
         .select("machine_id, scheduled_date, shift_category, memo")
         .gte("scheduled_date", startYmd)
         .lte("scheduled_date", endYmd)
-    : { data: [], error: null }
 
   if (memoError) {
     // SQL未適用の環境では予定表自体は表示できるようにする
@@ -175,22 +165,6 @@ export async function getWeeklyCalendarData(baseDate?: string): Promise<WeeklyCa
     })
   }
 
-  const filledCells = Object.entries(cells)
-  .filter(([, cell]) => cell.blocks.length > 0)
-  .map(([key, cell]) => ({
-    key,
-    machine_id: cell.machine_id,
-    shift_category: cell.shift_category,
-    date: cell.date,
-    blocksCount: cell.blocks.length,
-    firstBlock: cell.blocks[0]?.unit_name,
-  }))
-
-console.log("schedule cells debug", {
-  cellsCount: Object.keys(cells).length,
-  filledCellsCount: filledCells.length,
-  firstFilledCells: filledCells.slice(0, 10),
-})
 
   return {
     weekDays,

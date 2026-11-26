@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { requireScheduleApiSession } from "@/lib/schedule/require-api-session"
 
 export async function PATCH(request: NextRequest) {
+  const auth = await requireScheduleApiSession(request)
+  if (!auth.ok) return auth.response
   const body = await request.json()
   const blockIds = Array.isArray(body.blockIds) ? body.blockIds : []
 
@@ -12,7 +14,7 @@ export async function PATCH(request: NextRequest) {
     )
   }
 
-  const supabase = await createClient()
+  const supabase = auth.session.client
 
   const { data, error } = await supabase
     .from("schedule_blocks")

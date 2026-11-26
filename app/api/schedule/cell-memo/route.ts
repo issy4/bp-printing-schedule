@@ -1,18 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getScheduleErpSession } from "@/lib/schedule/erp-session"
+import { requireScheduleApiSession } from "@/lib/schedule/require-api-session"
 
 type Shift = "day" | "night"
 
 export async function PUT(request: NextRequest) {
   try {
-    if (request.headers.get("origin") !== new URL(request.url).origin) {
-      return NextResponse.json({ success: false, error: "不正なアクセス元です" }, { status: 403 })
-    }
-    const session = await getScheduleErpSession()
-    if (!session) {
-      return NextResponse.json({ success: false, error: "ERPから開き直してください（認証期限切れ）" }, { status: 401 })
-    }
-    const { client: supabase, user } = session
+    const auth = await requireScheduleApiSession(request)
+    if (!auth.ok) return auth.response
+    const { client: supabase, user } = auth.session
 
     const body: unknown = await request.json()
     if (!body || typeof body !== "object" || Array.isArray(body)) {

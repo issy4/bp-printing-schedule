@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
+import { requireScheduleApiSession } from "@/lib/schedule/require-api-session"
 
 export const dynamic = "force-dynamic"
 
@@ -15,6 +15,8 @@ const SEARCH_FIELDS = [
 const RESULT_LIMIT = 80
 
 export async function GET(request: NextRequest) {
+  const auth = await requireScheduleApiSession(request)
+  if (!auth.ok) return auth.response
   const q = (request.nextUrl.searchParams.get("q") ?? "").trim()
   const scope = request.nextUrl.searchParams.get("scope") ?? "all"
 
@@ -39,7 +41,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = await createClient()
+    const supabase = auth.session.client
     const filter = SEARCH_FIELDS.map((field) => `${field}.ilike.*${safe}*`).join(",")
 
     let query = supabase
