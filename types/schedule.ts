@@ -12,6 +12,12 @@ export type ScheduleBlockRow = {
   sequence_no: number | null
   planned_print_count: number | null
   block_note: string | null
+
+  // MQは基幹の親印刷指示（または手動作成した明細）単位で一度だけ計上
+  mq_key?: string | null
+  mq_is_first?: boolean
+  mq_amount?: number | null
+  mq_origin?: "source" | "manual" | "missing" | "not_first"
   block_status: "unassigned" | "tentative" | "assigned" | "confirmed" | "completed"
 
   machine_name: string | null
