@@ -55,6 +55,23 @@ WITH ranked_units AS (
     ) AS row_rank
   FROM public.print_units pu
   JOIN public.print_items pi ON pi.id = pu.print_item_id
+  -- 削除済み基幹明細を1台目判定から除外する。
+  -- 現行スケジュール表示ビューと同じ除外条件。
+  WHERE pi.legacy_print_uuid IS NULL
+     OR EXISTS (
+       SELECT 1
+       FROM public.prints_legacy active_child
+       WHERE active_child.row_uuid = pi.legacy_print_uuid
+         AND active_child.source_deleted_at IS NULL
+         AND (
+           active_child.parent_id IS NULL
+           OR EXISTS (
+             SELECT 1 FROM public.prints_legacy active_parent
+             WHERE active_parent.print_id = active_child.parent_id
+               AND active_parent.source_deleted_at IS NULL
+           )
+         )
+     )
 )
 SELECT
   ranked_units.print_unit_id,
