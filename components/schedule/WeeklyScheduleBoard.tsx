@@ -43,6 +43,10 @@ export type ScheduleBlockRow = {
   sequence_no: number | null
   planned_print_count: number | null
   block_note: string | null
+  mq_key?: string | null
+  mq_is_first?: boolean
+  mq_amount?: number | null
+  mq_origin?: "source" | "manual" | "missing" | "not_first"
   actual_start_at: string | null
   actual_end_at: string | null
   actual_work_minutes: number | null
@@ -183,19 +187,19 @@ function isAllowedErpOrigin(origin: string) {
 }
 
 const SCHEDULE_CELL_GRID =
-  "grid-cols-[44px_72px_240px_34px_34px_34px_34px_120px_58px_52px_90px_34px_72px_90px_90px_34px]"
+  "grid-cols-[44px_72px_240px_34px_34px_34px_34px_120px_58px_52px_90px_34px_72px_98px_90px_90px_34px]"
 
 const SCHEDULE_CELL_GRID_FOCUSED =
-  "grid-cols-[52px_90px_360px_42px_42px_42px_42px_170px_80px_70px_130px_44px_96px_130px_110px_44px]"
+  "grid-cols-[52px_90px_360px_42px_42px_42px_42px_170px_80px_70px_130px_44px_96px_120px_130px_110px_44px]"
 
-const SCHEDULE_TABLE_MIN_WIDTH = "min-w-[8200px]"
-const SCHEDULE_TABLE_MIN_WIDTH_FOCUSED = "min-w-[10400px]"
+const SCHEDULE_TABLE_MIN_WIDTH = "min-w-[9100px]"
+const SCHEDULE_TABLE_MIN_WIDTH_FOCUSED = "min-w-[12100px]"
 
 const MACHINE_COLUMN_WIDTH = "min-w-[104px]"
 const MACHINE_COLUMN_WIDTH_FOCUSED = "min-w-[120px]"
 
-const DAY_COLUMN_WIDTH_PX = 1150
-const DAY_COLUMN_WIDTH_PX_FOCUSED = 1450
+const DAY_COLUMN_WIDTH_PX = 1280
+const DAY_COLUMN_WIDTH_PX_FOCUSED = 1700
 
 const SCHEDULE_CELL_MIN_HEIGHT = 104
 const SCHEDULE_CELL_MIN_HEIGHT_FOCUSED = 180
@@ -743,6 +747,28 @@ function clearAssignedSelection() {
     })
   }, [data.machineRows, machineFilter])
 
+  // 表示フィルタにかかわらず、その日付に割り当て済みの全印刷機・全勤務を集計。
+  // 同じ親印刷指示の1台目に複数ブロックがあっても1回だけ計上する。
+  const dailyMqTotals = React.useMemo(() => {
+    const totals: Record<string, number> = {}
+    const counted = new Set<string>()
+    const cells = Object.values(data.cells)
+    for (const day of data.weekDays) {
+      totals[day.date] = 0
+      for (const cell of cells) {
+        if (cell.date !== day.date) continue
+        for (const block of cell.blocks) {
+          if (!block.mq_is_first || !block.mq_key ||
+              block.mq_amount == null || !Number.isFinite(block.mq_amount) ||
+              counted.has(block.mq_key)) continue
+          counted.add(block.mq_key)
+          totals[day.date] += block.mq_amount
+        }
+      }
+    }
+    return totals
+  }, [data.cells, data.weekDays])
+
   const today = formatYmd(new Date())
 
   React.useEffect(() => {
@@ -892,6 +918,40 @@ function clearAssignedSelection() {
       setData(previousData)
       alert("進捗の保存に失敗しました。")
     }
+  }
+
+  async function handleSaveMq(block: ScheduleBlockRow, value: string) {
+    if (!block.mq_key || !block.mq_is_first) {
+      throw new Error("MQの対象行が不正です")
+    }
+
+    const response = await fetch("/api/schedule/mq", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key: block.mq_key, amount: value }),
+    })
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(body.error ?? "MQの保存に失敗しました")
+    }
+
+    const amount = body.data?.amount == null ? null : Number(body.data.amount)
+    const origin = (body.data?.origin ?? "missing") as ScheduleBlockRow["mq_origin"]
+    const mqKey = block.mq_key
+    setData((current) => ({
+      ...current,
+      cells: Object.fromEntries(Object.entries(current.cells).map(([key, cell]) => [
+        key,
+        {
+          ...cell,
+          blocks: cell.blocks.map((item) =>
+            item.mq_key === mqKey && item.mq_is_first
+              ? { ...item, mq_amount: amount, mq_origin: origin }
+              : item
+          ),
+        },
+      ])),
+    }))
   }
 
   async function handleSaveNote(block: ScheduleBlockRow, note: string) {
@@ -1788,7 +1848,12 @@ style={{
   backgroundColor: getWeekdayHeaderColor(day.weekday),
 }}
   >
-    <div>{day.label}（{day.weekday}）</div>
+    <div className="flex items-center justify-between gap-6 px-2">
+      <span>{day.label}（{day.weekday}）</span>
+      <span className="whitespace-nowrap text-[13px] font-bold">
+        TOTAL MQ：{(dailyMqTotals[day.date] ?? 0).toLocaleString("ja-JP")}円
+      </span>
+    </div>
   </th>
 ))}
                 </tr>
@@ -1922,6 +1987,7 @@ style={{
             handleToggleProgress(block, field, checked)
           }
           onSaveNote={(note) => handleSaveNote(block, note)}
+          onSaveMq={(value) => handleSaveMq(block, value)}
         />
       </DraggableBlock>
     ))}
@@ -2384,6 +2450,7 @@ export function ScheduleCellHeader({
       <div className="border-r border-slate-300 px-1 py-0.5">色指定</div>
       <div className="border-r border-slate-300 px-1 py-0.5 text-center">特色</div>
       <div className="border-r border-slate-300 px-1 py-0.5 text-right">通紙</div>
+      <div className="border-r border-slate-300 px-1 py-0.5 text-right">MQ</div>
       <div className="border-r border-slate-300 px-1 py-0.5">特記</div>
       <div className="border-r border-slate-300 px-1 py-0.5">作業時間</div>
       <div className="border-r border-slate-300 px-1 py-0.5 text-center">刷了</div>
@@ -2400,6 +2467,7 @@ export function ScheduleCellItem({
   onClick,
   onToggleProgress,
   onSaveNote,
+  onSaveMq,
   gridClass = SCHEDULE_CELL_GRID,
   focused = false,
   selected = false,
@@ -2412,6 +2480,7 @@ export function ScheduleCellItem({
   onClick?: (event: React.MouseEvent<HTMLDivElement>) => void
   onToggleProgress?: (field: ProgressField, checked: boolean) => void
   onSaveNote?: (note: string) => void
+  onSaveMq?: (value: string) => Promise<void>
   gridClass?: string
   focused?: boolean
   selected?: boolean
@@ -2518,6 +2587,17 @@ export function ScheduleCellItem({
         <Cell className="justify-end text-right">
           {compactNumber(block.print_count)}
         </Cell>
+
+        {block.mq_is_first && block.mq_key ? (
+          <MqCell
+            mqKey={block.mq_key}
+            amount={block.mq_amount ?? null}
+            origin={block.mq_origin ?? "missing"}
+            onSave={(value) => onSaveMq ? onSaveMq(value) : Promise.resolve()}
+          />
+        ) : (
+          <div className="border-r border-slate-300 bg-slate-50" />
+        )}
 
         <NoteCell value={block.block_note} onSave={(value) => onSaveNote?.(value)} />
 
@@ -2934,6 +3014,79 @@ function Cell({
   return (
     <div title={title} className={`flex items-center border-r border-slate-300 px-1 py-0.5 ${className}`}>
       {children}
+    </div>
+  )
+}
+
+// MQ欄は数字のみ入力可能。入力中のドラッグ・行選択を抑制する。
+function MqCell({
+  mqKey,
+  amount,
+  origin,
+  onSave,
+}: {
+  mqKey: string
+  amount: number | null
+  origin: "source" | "manual" | "missing" | "not_first"
+  onSave: (value: string) => Promise<void>
+}) {
+  const committed = amount == null ? "" : String(amount)
+  const [text, setText] = React.useState(committed)
+  const [saving, setSaving] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    setText(committed)
+    setError(null)
+  }, [mqKey, committed])
+
+  const save = async () => {
+    if (saving || text === committed) return
+    if (text && !/^\d{1,12}$/.test(text)) {
+      setError("0以上の整数を入力してください")
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      await onSave(text)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "MQの保存に失敗しました")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div
+      className="min-w-0 border-r border-slate-300 px-1 py-0.5"
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <input
+        type="text"
+        inputMode="numeric"
+        aria-label="MQ金額"
+        title={origin === "source" ? "基幹から取得／変更すると手入力優先" : origin === "manual" ? "手入力MQ" : "MQ未設定"}
+        value={text}
+        disabled={saving}
+        placeholder="MQ入力"
+        maxLength={12}
+        onChange={(e) => {
+          if (/^\d{0,12}$/.test(e.target.value)) setText(e.target.value)
+        }}
+        onBlur={() => void save()}
+        onKeyDown={(e) => {
+          e.stopPropagation()
+          if (e.key === "Enter") e.currentTarget.blur()
+          if (e.key === "Escape") {
+            setText(committed)
+            e.currentTarget.blur()
+          }
+        }}
+        className="h-6 w-full rounded border border-slate-300 bg-white px-1 text-right text-[11px] tabular-nums focus:border-blue-500 focus:outline-none disabled:opacity-60"
+      />
+      {error ? <p role="alert" className="mt-0.5 text-[10px] text-red-600">{error}</p> : null}
     </div>
   )
 }
