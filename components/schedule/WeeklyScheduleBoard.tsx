@@ -1849,8 +1849,8 @@ style={{
 }}
   >
     <div className="flex items-center justify-between gap-6 px-2">
-      <span>{day.label}（{day.weekday}）</span>
-      <span className="whitespace-nowrap text-[13px] font-bold">
+      <span className="whitespace-nowrap text-[20px]">{day.label}（{day.weekday}）</span>
+      <span className="whitespace-nowrap text-[20px] font-bold">
         TOTAL MQ：{(dailyMqTotals[day.date] ?? 0).toLocaleString("ja-JP")}円
       </span>
     </div>
